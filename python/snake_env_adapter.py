@@ -33,17 +33,30 @@ class SnakeEnvAdapter:
     def __init__(
         self,
         env_name: str = "Snake-v0",
+        grid_size: int = 84,
+        tile_size: int | None = None,
         initial_length: int = 4,
         normalize_rewards: bool = True,
+        binary_observation: bool = True,
     ):
         if gym is None:
             raise RuntimeError(
                 "`gym` is required to use SnakeEnvAdapter. Install gym and gym-snake first."
             )
         self._ensure_snake_registered()
-        self.env = self._make_env(env_name)
+        self.grid_size = max(4, int(grid_size))
+        if tile_size is None:
+            # Keep rendered windows usable for larger grids.
+            tile_size = max(4, 640 // self.grid_size)
+        self.tile_size = max(1, int(tile_size))
+
+        self.env = self._make_env(
+            env_name,
+            env_kwargs={"dim": self.grid_size, "size": self.tile_size},
+        )
         self.initial_length = max(1, int(initial_length))
         self.normalize_rewards = bool(normalize_rewards)
+        self.binary_observation = bool(binary_observation)
         self.obs: np.ndarray | None = None
         self.done = False
         self.score = 0.0
@@ -132,13 +145,14 @@ class SnakeEnvAdapter:
             if "snake" in env_id.lower()
         )
 
-    def _make_env(self, env_name: str):
+    def _make_env(self, env_name: str, env_kwargs: dict[str, Any] | None = None):
+        kwargs = env_kwargs or {}
         try:
-            return gym.make(env_name)
+            return gym.make(env_name, **kwargs)
         except Exception:
             if env_name != "Snake-v0":
                 try:
-                    return gym.make("Snake-v0")
+                    return gym.make("Snake-v0", **kwargs)
                 except Exception:
                     pass
             available = self._available_snake_envs()
@@ -194,15 +208,18 @@ class SnakeEnvAdapter:
                 snake = list(unwrapped.snake)
                 for index, (x, y) in enumerate(snake):
                     if 0 <= x < dim and 0 <= y < dim:
-                        grid[x, y] = 2 if index == 0 else 1
+                        grid[x, y] = 1
 
                 if len(unwrapped.apple) == 2:
                     ax, ay = int(unwrapped.apple[0]), int(unwrapped.apple[1])
                     if 0 <= ax < dim and 0 <= ay < dim:
-                        grid[ax, ay] = 3
+                        grid[ax, ay] = 1
                 return grid
 
-        return self._process_obs(obs)
+        arr = self._process_obs(obs)
+        if self.binary_observation:
+            return (arr > 0).astype(np.uint8)
+        return arr
 
 
 class FrameStack:
