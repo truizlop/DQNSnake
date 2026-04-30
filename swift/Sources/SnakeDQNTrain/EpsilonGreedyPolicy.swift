@@ -18,6 +18,10 @@ struct EpsilonGreedyPolicy {
         return greedyAction
     }
 
+    func epsilon(at globalStep: Int) -> Float {
+        epsilonValue(globalStep: globalStep)
+    }
+
     private func epsilonValue(globalStep: Int) -> Float {
         guard epsilonDecaySteps > 0 else {
             return epsilonEnd

@@ -18,6 +18,8 @@ struct SnakeDQNTrainApp {
         let tensorBoardPort = Int(ProcessInfo.processInfo.environment["SNAKE_TB_PORT"] ?? "6006") ?? 6006
         let evalEveryEpisodes = Int(ProcessInfo.processInfo.environment["SNAKE_EVAL_EVERY_EPISODES"] ?? "0") ?? 0
         let evalEpisodes = Int(ProcessInfo.processInfo.environment["SNAKE_EVAL_EPISODES"] ?? "5") ?? 5
+        let enableStructuredLogs = (ProcessInfo.processInfo.environment["SNAKE_OBS_ENABLE"] ?? "1") == "1"
+        let structuredLogPath = ProcessInfo.processInfo.environment["SNAKE_OBS_LOG_PATH"] ?? "runs/snake_dqn/observability.jsonl"
 
         var trainer = DQNTrainer(
             env: SnakeEnv(usePythonBridge: true, pythonModulePath: pythonDir),
@@ -30,7 +32,9 @@ struct SnakeDQNTrainApp {
                 enableTensorBoard: enableTensorBoard,
                 launchTensorBoard: launchTensorBoard,
                 tensorBoardLogDir: tensorBoardLogDir,
-                tensorBoardPort: tensorBoardPort
+                tensorBoardPort: tensorBoardPort,
+                enableStructuredLogs: enableStructuredLogs,
+                structuredLogPath: structuredLogPath
             )
         )
 

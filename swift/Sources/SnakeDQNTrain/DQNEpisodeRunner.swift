@@ -15,6 +15,7 @@ struct DQNEpisodeRunner {
         var stepsInEpisode = 0
         var totalReward: Float = 0
         var finalScore: Float = 0
+        var actionCounts = Dictionary(uniqueKeysWithValues: SnakeAction.allCases.map { ($0, 0) })
 
         let initial = try await env.reset()
         var frameStack = FrameStack(capacity: 4)
@@ -23,6 +24,7 @@ struct DQNEpisodeRunner {
 
         while globalStep < totalEnvironmentSteps && stepsInEpisode < maxStepsPerEpisode {
             let action = selectAction(state, globalStep)
+            actionCounts[action, default: 0] += 1
             let stepResult = try await env.step(action: action.rawValue)
 
             frameStack.append(stepResult.observation)
@@ -55,7 +57,8 @@ struct DQNEpisodeRunner {
         return DQNEpisodeResult(
             steps: stepsInEpisode,
             totalReward: totalReward,
-            finalScore: finalScore
+            finalScore: finalScore,
+            actionCounts: actionCounts
         )
     }
 

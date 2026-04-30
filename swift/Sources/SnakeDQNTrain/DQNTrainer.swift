@@ -13,6 +13,7 @@ struct DQNTrainer {
     var checkpointManager: DQNCheckpointManager
     var lastTrainStepMetrics: DQNTrainStepMetrics?
     var tensorBoardPublisher: TensorBoardMetricsPublisher?
+    var structuredLogger: DQNStructuredLogger?
 
     init(env: SnakeEnv, config: DQNTrainingConfig = DQNTrainingConfig()) {
         self.env = env
@@ -42,11 +43,13 @@ struct DQNTrainer {
         )
         self.lastTrainStepMetrics = nil
         self.tensorBoardPublisher = nil
+        self.structuredLogger = nil
     }
 
     mutating func run() async throws {
         defer {
             tensorBoardPublisher?.stop()
+            structuredLogger?.stop()
         }
 
         if config.enableTensorBoard {
@@ -59,12 +62,18 @@ struct DQNTrainer {
             try publisher.start()
             self.tensorBoardPublisher = publisher
         }
+        if config.enableStructuredLogs {
+            let logger = DQNStructuredLogger(outputPath: config.structuredLogPath)
+            try logger.start()
+            self.structuredLogger = logger
+        }
 
         var globalStep = try maybeResumeFromCheckpoint()
         var episode = 0
 
         while globalStep < config.totalEnvironmentSteps {
             episode += 1
+            let episodeStart = Date()
             let episodeResult = try await episodeRunner.runEpisode(
                 globalStep: &globalStep,
                 totalEnvironmentSteps: config.totalEnvironmentSteps,
@@ -88,6 +97,32 @@ struct DQNTrainer {
                     "train/episode_reward": episodeResult.totalReward,
                     "train/episode_score": episodeResult.finalScore,
                     "train/episode_steps": Float(episodeResult.steps),
+                    "train/replay_size": Float(replayBuffer.count),
+                    "train/replay_fill_ratio": Float(replayBuffer.count) / Float(config.replayBufferCapacity),
+                    "train/epsilon": explorationPolicy.epsilon(at: globalStep),
+                    "train/episode_duration_s": Float(Date().timeIntervalSince(episodeStart)),
+                    "train/action_up": Float(episodeResult.actionCounts[.up] ?? 0),
+                    "train/action_left": Float(episodeResult.actionCounts[.left] ?? 0),
+                    "train/action_down": Float(episodeResult.actionCounts[.down] ?? 0),
+                    "train/action_right": Float(episodeResult.actionCounts[.right] ?? 0),
+                ]
+            )
+            structuredLogger?.log(
+                event: "episode_end",
+                step: globalStep,
+                fields: [
+                    "episode": "\(episode)",
+                    "episode_steps": "\(episodeResult.steps)",
+                    "episode_reward": "\(episodeResult.totalReward)",
+                    "episode_score": "\(episodeResult.finalScore)",
+                    "episode_duration_s": "\(Date().timeIntervalSince(episodeStart))",
+                    "epsilon": "\(explorationPolicy.epsilon(at: globalStep))",
+                    "replay_size": "\(replayBuffer.count)",
+                    "replay_fill_ratio": "\(Float(replayBuffer.count) / Float(config.replayBufferCapacity))",
+                    "action_up": "\(episodeResult.actionCounts[.up] ?? 0)",
+                    "action_left": "\(episodeResult.actionCounts[.left] ?? 0)",
+                    "action_down": "\(episodeResult.actionCounts[.down] ?? 0)",
+                    "action_right": "\(episodeResult.actionCounts[.right] ?? 0)",
                 ]
             )
 
@@ -101,6 +136,16 @@ struct DQNTrainer {
                 print(
                     "eval episode=\(episode) episodes=\(evaluation.episodes) avgReward=\(evaluation.averageReward) avgScore=\(evaluation.averageScore)"
                 )
+                structuredLogger?.log(
+                    event: "evaluation",
+                    step: globalStep,
+                    fields: [
+                        "episode": "\(episode)",
+                        "eval_episodes": "\(evaluation.episodes)",
+                        "eval_avg_reward": "\(evaluation.averageReward)",
+                        "eval_avg_score": "\(evaluation.averageScore)",
+                    ]
+                )
                 try checkpointManager.maybeSaveBestCheckpoint(
                     saver: learner,
                     metricValue: evaluation.averageScore,
@@ -111,6 +156,15 @@ struct DQNTrainer {
                         "eval_episodes": "\(evaluation.episodes)",
                         "eval_avg_reward": "\(evaluation.averageReward)",
                         "eval_avg_score": "\(evaluation.averageScore)",
+                    ]
+                )
+                structuredLogger?.log(
+                    event: "checkpoint_best_saved",
+                    step: globalStep,
+                    fields: [
+                        "episode": "\(episode)",
+                        "metric_name": "eval_avg_score",
+                        "metric_value": "\(evaluation.averageScore)",
                     ]
                 )
                 tensorBoardPublisher?.publish(
@@ -148,8 +202,20 @@ struct DQNTrainer {
         }
         if shouldSyncTarget(globalStep: globalStep) {
             learner.syncTargetFromOnline()
+            structuredLogger?.log(
+                event: "target_sync",
+                step: globalStep,
+                fields: ["target_sync_every": "\(config.targetSyncEvery)"]
+            )
         }
         try checkpointManager.maybeSaveStepCheckpoint(saver: learner, globalStep: globalStep)
+        if config.checkpointEverySteps > 0 && globalStep > 0 && globalStep % config.checkpointEverySteps == 0 {
+            structuredLogger?.log(
+                event: "checkpoint_periodic_saved",
+                step: globalStep,
+                fields: ["checkpoint_every_steps": "\(config.checkpointEverySteps)"]
+            )
+        }
     }
 
     private func selectAction(state: MLXArray, globalStep: Int) -> SnakeAction {
@@ -160,10 +226,12 @@ struct DQNTrainer {
     }
 
     private mutating func optimizeFromReplay(globalStep: Int) {
+        let startedAt = Date()
         let transitions = replayBuffer.sample(batchSize: config.batchSize)
         let batch = DQNBatch(transitions: transitions)
         lastTrainStepMetrics = learner.trainStep(batch: batch)
         if let metrics = lastTrainStepMetrics {
+            let optimizeDuration = Float(Date().timeIntervalSince(startedAt))
             tensorBoardPublisher?.publish(
                 step: globalStep,
                 scalars: [
@@ -172,6 +240,21 @@ struct DQNTrainer {
                     "train/q_max_abs": metrics.maxAbsQ,
                     "train/grad_l2": metrics.gradientL2Norm,
                     "train/skipped_update": metrics.skippedUpdate ? 1 : 0,
+                    "train/optimize_duration_s": optimizeDuration,
+                ]
+            )
+            structuredLogger?.log(
+                event: "optimize_step",
+                step: globalStep,
+                fields: [
+                    "loss": "\(metrics.loss)",
+                    "q_mean_abs": "\(metrics.meanAbsQ)",
+                    "q_max_abs": "\(metrics.maxAbsQ)",
+                    "grad_l2": "\(metrics.gradientL2Norm)",
+                    "skipped_update": "\(metrics.skippedUpdate ? 1 : 0)",
+                    "optimize_duration_s": "\(optimizeDuration)",
+                    "batch_size": "\(config.batchSize)",
+                    "replay_size": "\(replayBuffer.count)",
                 ]
             )
         }
@@ -197,6 +280,14 @@ struct DQNTrainer {
         let metadata = try learner.loadOnlineModel(from: url)
         let resumedStep = Int(metadata["global_step"] ?? "") ?? 0
         print("resumed from checkpoint=\(standardized) globalStep=\(resumedStep)")
+        structuredLogger?.log(
+            event: "resume",
+            step: resumedStep,
+            fields: [
+                "checkpoint_path": standardized,
+                "resumed_step": "\(resumedStep)",
+            ]
+        )
         return resumedStep
     }
 

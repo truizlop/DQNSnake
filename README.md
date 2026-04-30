@@ -20,6 +20,7 @@ Single-player Snake training stack with:
   - periodic greedy evaluation loop
   - training quality checks (loss/Q scale/gradient norm + skip-on-invalid update)
 - TensorBoard integration from Swift training process
+- Structured JSONL observability event log
 
 ## Repository structure
 
@@ -85,6 +86,10 @@ TensorBoard env vars:
 - `SNAKE_TB_LOGDIR` (default `runs/snake_dqn`)
 - `SNAKE_TB_PORT` (default `6006`)
 
+Observability env vars:
+- `SNAKE_OBS_ENABLE` (`1` default)
+- `SNAKE_OBS_LOG_PATH` (default `runs/snake_dqn/observability.jsonl`)
+
 ## TensorBoard usage
 
 `snake-dqn-train` can publish metrics directly to TensorBoard event files through `python/tensorboard_stream.py`.
@@ -107,8 +112,26 @@ Logged scalar groups:
 - `train/episode_reward`
 - `train/episode_score`
 - `train/episode_steps`
+- `train/replay_size`
+- `train/replay_fill_ratio`
+- `train/epsilon`
+- `train/episode_duration_s`
+- `train/action_up`
+- `train/action_left`
+- `train/action_down`
+- `train/action_right`
+- `train/optimize_duration_s`
 - `eval/avg_reward`
 - `eval/avg_score`
+
+Structured log event stream (`SNAKE_OBS_LOG_PATH`) includes:
+- `resume`
+- `episode_end`
+- `optimize_step`
+- `evaluation`
+- `target_sync`
+- `checkpoint_periodic_saved`
+- `checkpoint_best_saved`
 
 ## Swift API
 
