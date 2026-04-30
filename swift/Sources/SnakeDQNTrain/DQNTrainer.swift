@@ -13,7 +13,10 @@ struct DQNTrainer {
     init(env: SnakeEnv, config: DQNTrainingConfig = DQNTrainingConfig()) {
         self.env = env
         self.config = config
-        self.replayBuffer = ReplayBuffer(capacity: config.replayBufferCapacity)
+        self.replayBuffer = ReplayBuffer(
+            capacity: config.replayBufferCapacity,
+            samplingStrategy: config.replaySamplingStrategy
+        )
         self.learner = DQNLearner(gamma: config.gamma, learningRate: config.learningRate)
         self.explorationPolicy = EpsilonGreedyPolicy(
             epsilonStart: config.epsilonStart,

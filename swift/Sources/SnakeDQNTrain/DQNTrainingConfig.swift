@@ -5,6 +5,7 @@ struct DQNTrainingConfig {
     var totalEnvironmentSteps: Int = 200_000
     var maxStepsPerEpisode: Int = 10_000
     var replayBufferCapacity: Int = 100_000
+    var replaySamplingStrategy: ReplaySamplingStrategy = .withReplacement
 
     // DQN scheduling knobs
     var warmupSteps: Int = 5_000
