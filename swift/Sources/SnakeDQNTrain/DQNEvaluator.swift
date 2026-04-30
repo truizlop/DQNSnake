@@ -64,13 +64,14 @@ struct DQNEvaluator {
         return DQNEpisodeResult(
             steps: stepsInEpisode,
             totalReward: totalReward,
-            finalScore: finalScore
+            finalScore: finalScore,
+            actionCounts: [:]
         )
     }
 
     private func stateTensor(from stackedFrames: [UInt8], width: Int, height: Int) -> MLXArray {
         let values = stackedFrames.map { Float($0) }
         let array = MLXArray(values)
-        return array.reshaped(1, 4, height, width)
+        return array.reshaped(1, height, width, 4)
     }
 }

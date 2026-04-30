@@ -47,6 +47,19 @@ final class TensorBoardMetricsPublisher {
         try writer.run()
         self.writerProcess = writer
         self.writerStdin = stdinPipe.fileHandleForWriting
+        // If the Python writer exits immediately (e.g. missing tensorboard package),
+        // fail fast here instead of crashing later on pipe writes.
+        usleep(200_000)
+        if !writer.isRunning {
+            throw NSError(
+                domain: "TensorBoardMetricsPublisher",
+                code: 2,
+                userInfo: [
+                    NSLocalizedDescriptionKey:
+                        "tensorboard stream writer exited early. Ensure `tensorboard` is installed for \(pythonExecutable)."
+                ]
+            )
+        }
 
         if launchTensorBoard {
             let tensorBoard = Process()

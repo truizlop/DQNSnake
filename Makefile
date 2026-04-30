@@ -5,7 +5,7 @@ SWIFT_DIR := swift
 
 .DEFAULT_GOAL := help
 
-.PHONY: help setup build build-swift test test-python test-swift run run-smoke run-visual run-swift run-swift-visual run-dqn clean
+.PHONY: help setup build build-swift test test-python test-swift run run-smoke run-visual run-swift run-swift-visual run-dqn prepare-mlx-metallib clean
 
 help: ## Show available targets
 	@echo "Snake DQN - Main Commands"
@@ -52,10 +52,15 @@ run-swift-visual: ## Run Swift-controlled snake with pygame rendering
 	SNAKE_VISUAL=1 \
 	swift run --package-path $(SWIFT_DIR) snake-env-cli
 
-run-dqn: ## Run DQN scaffold (set SNAKE_ENABLE_MLX=1 for MLX tensor ops)
+prepare-mlx-metallib: ## Build MLX metallib required by command-line MLX runs
+	@./scripts/ensure_mlx_metallib.sh
+
+run-dqn: ## Run DQN trainer
 	@PATH="$${PATH//:\/opt\/anaconda3\/bin/}"; PATH="$${PATH//\/opt\/anaconda3\/bin:/}"; \
+	./scripts/ensure_mlx_metallib.sh; \
 	SNAKE_PYTHON_DIR=python \
 	SNAKE_PYTHON_EXE=/opt/anaconda3/bin/python3 \
+	SNAKE_MLX_DEVICE=cpu \
 	swift run --package-path $(SWIFT_DIR) snake-dqn-train
 
 clean: ## Remove build/test caches

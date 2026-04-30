@@ -1,3 +1,4 @@
+import Cmlx
 import Foundation
 import MLX
 import MLXNN
@@ -24,11 +25,25 @@ struct SnakeDQNTrainApp {
         let evalEveryEpisodes =
             Int(ProcessInfo.processInfo.environment["SNAKE_EVAL_EVERY_EPISODES"] ?? "") ?? config.evalEveryEpisodes
         let evalEpisodes = Int(ProcessInfo.processInfo.environment["SNAKE_EVAL_EPISODES"] ?? "") ?? config.evalEpisodes
+        let warmupSteps = Int(ProcessInfo.processInfo.environment["SNAKE_WARMUP_STEPS"] ?? "") ?? config.warmupSteps
+        let trainEvery = Int(ProcessInfo.processInfo.environment["SNAKE_TRAIN_EVERY"] ?? "") ?? config.trainEvery
+        let targetSyncEvery =
+            Int(ProcessInfo.processInfo.environment["SNAKE_TARGET_SYNC_EVERY"] ?? "") ?? config.targetSyncEvery
+        let batchSize = Int(ProcessInfo.processInfo.environment["SNAKE_BATCH_SIZE"] ?? "") ?? config.batchSize
+        let checkpointEverySteps =
+            Int(ProcessInfo.processInfo.environment["SNAKE_CHECKPOINT_EVERY_STEPS"] ?? "")
+            ?? config.checkpointEverySteps
+        let checkpointDirectory =
+            ProcessInfo.processInfo.environment["SNAKE_CHECKPOINT_DIR"] ?? config.checkpointDirectory
         let enableStructuredLogs =
             (ProcessInfo.processInfo.environment["SNAKE_OBS_ENABLE"] ?? (config.enableStructuredLogs ? "1" : "0"))
             == "1"
         let structuredLogPath = ProcessInfo.processInfo.environment["SNAKE_OBS_LOG_PATH"] ?? config.structuredLogPath
+        let mlxDevice = (ProcessInfo.processInfo.environment["SNAKE_MLX_DEVICE"] ?? "cpu").lowercased()
         let trainingSeed = ProcessInfo.processInfo.environment["SNAKE_SEED"].flatMap(Int.init)
+        let deviceType = mlxDevice == "gpu" ? MLX_GPU : MLX_CPU
+        let device = mlx_device_new_type(deviceType, 0)
+        mlx_set_default_device(device)
         if let trainingSeed {
             MLXRandom.seed(UInt64(bitPattern: Int64(trainingSeed)))
         }
@@ -38,6 +53,12 @@ struct SnakeDQNTrainApp {
         config.resumeCheckpointPath = resumeCheckpointPath
         config.evalEveryEpisodes = evalEveryEpisodes
         config.evalEpisodes = evalEpisodes
+        config.warmupSteps = warmupSteps
+        config.trainEvery = trainEvery
+        config.targetSyncEvery = targetSyncEvery
+        config.batchSize = batchSize
+        config.checkpointEverySteps = checkpointEverySteps
+        config.checkpointDirectory = checkpointDirectory
         config.enableTensorBoard = enableTensorBoard
         config.launchTensorBoard = launchTensorBoard
         config.tensorBoardLogDir = tensorBoardLogDir

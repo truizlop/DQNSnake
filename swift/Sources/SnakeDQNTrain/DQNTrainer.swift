@@ -284,19 +284,19 @@ struct DQNTrainer {
 
     private func enforceStabilityGuards(metrics: DQNTrainStepMetrics, globalStep: Int) throws {
         if metrics.loss.isFinite, metrics.loss > config.maxLossForUpdate {
-            throwAndLogGuardError(
+            try throwAndLogGuardError(
                 .lossExceeded(limit: config.maxLossForUpdate, observed: metrics.loss, step: globalStep),
                 globalStep: globalStep
             )
         }
         if metrics.maxAbsQ.isFinite, metrics.maxAbsQ > config.maxAbsQValue {
-            throwAndLogGuardError(
+            try throwAndLogGuardError(
                 .qValueExceeded(limit: config.maxAbsQValue, observed: metrics.maxAbsQ, step: globalStep),
                 globalStep: globalStep
             )
         }
         if metrics.gradientL2Norm.isFinite, metrics.gradientL2Norm > config.maxGradientL2Norm {
-            throwAndLogGuardError(
+            try throwAndLogGuardError(
                 .gradientNormExceeded(
                     limit: config.maxGradientL2Norm,
                     observed: metrics.gradientL2Norm,
@@ -306,7 +306,7 @@ struct DQNTrainer {
             )
         }
         if stabilityTracker.consecutiveSkippedUpdates >= config.maxConsecutiveSkippedUpdates {
-            throwAndLogGuardError(
+            try throwAndLogGuardError(
                 .consecutiveSkippedUpdatesExceeded(
                     limit: config.maxConsecutiveSkippedUpdates,
                     observed: stabilityTracker.consecutiveSkippedUpdates,

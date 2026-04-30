@@ -65,6 +65,7 @@ From repo root:
 - `make run-swift`: Swift-controlled rollout via bridge
 - `make run-swift-visual`: Swift-controlled rollout + pygame rendering
 - `make run-dqn`: run Swift DQN trainer target
+  - auto-builds `default.metallib` if missing (`make prepare-mlx-metallib`)
 
 Useful env vars:
 
@@ -74,12 +75,21 @@ Useful env vars:
 - `SNAKE_MAX_EPISODE_STEPS` (Swift DQN trainer)
 - `SNAKE_PYTHON_EXE` (Python binary for Swift bridge; defaults to `/opt/anaconda3/bin/python3` when available)
 - `SNAKE_PYTHON_DIR` (Python module directory; defaults to `python/`)
+- `SNAKE_MLX_DEVICE` (`cpu` or `gpu`, default `cpu` for CLI stability)
 - `SNAKE_RESUME_CHECKPOINT` (path to `.safetensors` checkpoint to resume from)
 - `SNAKE_SEED` (optional int; enables deterministic replay sampling, epsilon exploration RNG, and seeded Python env resets)
 
 Evaluation env vars:
 - `SNAKE_EVAL_EVERY_EPISODES` (default `0`, disabled)
 - `SNAKE_EVAL_EPISODES` (default `5`)
+
+Training schedule override env vars:
+- `SNAKE_WARMUP_STEPS`
+- `SNAKE_TRAIN_EVERY`
+- `SNAKE_TARGET_SYNC_EVERY`
+- `SNAKE_BATCH_SIZE`
+- `SNAKE_CHECKPOINT_EVERY_STEPS`
+- `SNAKE_CHECKPOINT_DIR`
 
 TensorBoard env vars:
 - `SNAKE_TB_ENABLE` (`1` default)
