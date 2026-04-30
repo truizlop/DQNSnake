@@ -79,10 +79,25 @@ struct DQNTrainer {
     }
 
     private func selectActionPlaceholder(state: MLXArray, globalStep: Int) -> SnakeAction {
-        _ = state
-        _ = globalStep
-        // TODO: Implement epsilon-greedy action selection from onlineQNetwork(state).
-        return SnakeAction.allCases.randomElement()!
+        let epsilon = epsilonValue(globalStep: globalStep)
+        if Float.random(in: 0..<1) < epsilon {
+            return SnakeAction.allCases.randomElement()!
+        }
+
+        let qValues = onlineQNetwork(state)
+        let greedyActionIndex = qValues.argMax().item(Int.self)
+        return SnakeAction(rawValue: greedyActionIndex) ?? .up
+    }
+
+    private func epsilonValue(globalStep: Int) -> Float {
+        guard config.epsilonDecaySteps > 0 else {
+            return config.epsilonEnd
+        }
+
+        let clampedStep = min(max(globalStep, 0), config.epsilonDecaySteps)
+        let progress = Float(clampedStep) / Float(config.epsilonDecaySteps)
+        let epsilon = config.epsilonStart + (config.epsilonEnd - config.epsilonStart) * progress
+        return min(max(epsilon, min(config.epsilonStart, config.epsilonEnd)), max(config.epsilonStart, config.epsilonEnd))
     }
 
     private func maybeTrainPlaceholder(globalStep: Int, replayBufferCount: Int) {
