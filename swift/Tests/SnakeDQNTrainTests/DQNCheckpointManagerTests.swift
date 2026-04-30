@@ -50,9 +50,9 @@ private func temporaryDirectoryURL() -> URL {
     let bestPath = directory.appendingPathComponent("model_best.safetensors").path
     try manager.maybeSaveBestCheckpoint(
         saver: saver,
-        episodeResult: DQNEpisodeResult(steps: 10, totalReward: 5, finalScore: 1),
-        episode: 1,
-        globalStep: 10
+        metricValue: 1,
+        metricName: "eval_avg_score",
+        metadata: ["global_step": "10", "episode": "1"]
     )
     #expect(FileManager.default.fileExists(atPath: bestPath))
 
@@ -61,9 +61,9 @@ private func temporaryDirectoryURL() -> URL {
     // Lower score should not update best checkpoint.
     try manager.maybeSaveBestCheckpoint(
         saver: saver,
-        episodeResult: DQNEpisodeResult(steps: 12, totalReward: 3, finalScore: 0),
-        episode: 2,
-        globalStep: 20
+        metricValue: 0,
+        metricName: "eval_avg_score",
+        metadata: ["global_step": "20", "episode": "2"]
     )
     let secondTimestamp = try FileManager.default.attributesOfItem(atPath: bestPath)[.modificationDate] as? Date
     #expect(firstTimestamp == secondTimestamp)

@@ -38,28 +38,26 @@ struct DQNCheckpointManager {
 
     mutating func maybeSaveBestCheckpoint(
         saver: some DQNModelCheckpointSaving,
-        episodeResult: DQNEpisodeResult,
-        episode: Int,
-        globalStep: Int
+        metricValue: Float,
+        metricName: String,
+        metadata: [String: String]
     ) throws {
         guard
             saveBestCheckpoint,
-            bestScore == nil || episodeResult.finalScore > bestScore!
+            bestScore == nil || metricValue > bestScore!
         else {
             return
         }
-        bestScore = episodeResult.finalScore
+        bestScore = metricValue
         try createDirectoryIfNeeded()
         let url = directoryURL.appendingPathComponent("model_best.safetensors")
+        var mergedMetadata = metadata
+        mergedMetadata["kind"] = "best"
+        mergedMetadata["best_metric_name"] = metricName
+        mergedMetadata["best_metric_value"] = "\(metricValue)"
         try saver.saveOnlineModel(
             to: url,
-            metadata: [
-                "global_step": "\(globalStep)",
-                "episode": "\(episode)",
-                "kind": "best",
-                "best_score": "\(episodeResult.finalScore)",
-                "total_reward": "\(episodeResult.totalReward)",
-            ]
+            metadata: mergedMetadata
         )
     }
 

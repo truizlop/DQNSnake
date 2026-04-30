@@ -77,13 +77,6 @@ struct DQNTrainer {
                 }
             )
 
-            try checkpointManager.maybeSaveBestCheckpoint(
-                saver: learner,
-                episodeResult: episodeResult,
-                episode: episode,
-                globalStep: globalStep
-            )
-
             print(episodeLogLine(
                 episode: episode,
                 episodeResult: episodeResult,
@@ -107,6 +100,18 @@ struct DQNTrainer {
                 )
                 print(
                     "eval episode=\(episode) episodes=\(evaluation.episodes) avgReward=\(evaluation.averageReward) avgScore=\(evaluation.averageScore)"
+                )
+                try checkpointManager.maybeSaveBestCheckpoint(
+                    saver: learner,
+                    metricValue: evaluation.averageScore,
+                    metricName: "eval_avg_score",
+                    metadata: [
+                        "global_step": "\(globalStep)",
+                        "episode": "\(episode)",
+                        "eval_episodes": "\(evaluation.episodes)",
+                        "eval_avg_reward": "\(evaluation.averageReward)",
+                        "eval_avg_score": "\(evaluation.averageScore)",
+                    ]
                 )
                 tensorBoardPublisher?.publish(
                     step: globalStep,
