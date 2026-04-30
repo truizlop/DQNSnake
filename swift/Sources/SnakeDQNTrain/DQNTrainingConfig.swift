@@ -12,6 +12,10 @@ struct DQNTrainingConfig {
     var resumeCheckpointPath: String? = nil
     var evalEveryEpisodes: Int = 0
     var evalEpisodes: Int = 5
+    var enableTensorBoard: Bool = true
+    var launchTensorBoard: Bool = true
+    var tensorBoardLogDir: String = "runs/snake_dqn"
+    var tensorBoardPort: Int = 6006
 
     // DQN scheduling knobs
     var warmupSteps: Int = 5_000

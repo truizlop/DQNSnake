@@ -11,6 +11,8 @@ struct DQNTrainer {
     let episodeRunner: DQNEpisodeRunner
     let evaluator: DQNEvaluator
     var checkpointManager: DQNCheckpointManager
+    var lastTrainStepMetrics: DQNTrainStepMetrics?
+    var tensorBoardPublisher: TensorBoardMetricsPublisher?
 
     init(env: SnakeEnv, config: DQNTrainingConfig = DQNTrainingConfig()) {
         self.env = env
@@ -38,9 +40,26 @@ struct DQNTrainer {
             checkpointEverySteps: config.checkpointEverySteps,
             saveBestCheckpoint: config.saveBestCheckpoint
         )
+        self.lastTrainStepMetrics = nil
+        self.tensorBoardPublisher = nil
     }
 
     mutating func run() async throws {
+        defer {
+            tensorBoardPublisher?.stop()
+        }
+
+        if config.enableTensorBoard {
+            let publisher = TensorBoardMetricsPublisher(
+                logDir: config.tensorBoardLogDir,
+                launchTensorBoard: config.launchTensorBoard,
+                tensorBoardPort: config.tensorBoardPort,
+                pythonExecutable: Self.pythonExecutable()
+            )
+            try publisher.start()
+            self.tensorBoardPublisher = publisher
+        }
+
         var globalStep = try maybeResumeFromCheckpoint()
         var episode = 0
 
@@ -65,8 +84,18 @@ struct DQNTrainer {
                 globalStep: globalStep
             )
 
-            print(
-                "episode=\(episode) steps=\(episodeResult.steps) reward=\(episodeResult.totalReward) score=\(episodeResult.finalScore) globalStep=\(globalStep)"
+            print(episodeLogLine(
+                episode: episode,
+                episodeResult: episodeResult,
+                globalStep: globalStep
+            ))
+            tensorBoardPublisher?.publish(
+                step: globalStep,
+                scalars: [
+                    "train/episode_reward": episodeResult.totalReward,
+                    "train/episode_score": episodeResult.finalScore,
+                    "train/episode_steps": Float(episodeResult.steps),
+                ]
             )
 
             if shouldEvaluate(episode: episode) {
@@ -78,6 +107,13 @@ struct DQNTrainer {
                 )
                 print(
                     "eval episode=\(episode) episodes=\(evaluation.episodes) avgReward=\(evaluation.averageReward) avgScore=\(evaluation.averageScore)"
+                )
+                tensorBoardPublisher?.publish(
+                    step: globalStep,
+                    scalars: [
+                        "eval/avg_reward": evaluation.averageReward,
+                        "eval/avg_score": evaluation.averageScore,
+                    ]
                 )
             }
         }
@@ -103,7 +139,7 @@ struct DQNTrainer {
 
     private mutating func applyTrainingSchedule(globalStep: Int) throws {
         if shouldOptimize(globalStep: globalStep) {
-            optimizeFromReplay()
+            optimizeFromReplay(globalStep: globalStep)
         }
         if shouldSyncTarget(globalStep: globalStep) {
             learner.syncTargetFromOnline()
@@ -118,10 +154,32 @@ struct DQNTrainer {
         )
     }
 
-    private mutating func optimizeFromReplay() {
+    private mutating func optimizeFromReplay(globalStep: Int) {
         let transitions = replayBuffer.sample(batchSize: config.batchSize)
         let batch = DQNBatch(transitions: transitions)
-        _ = learner.trainStep(batch: batch)
+        lastTrainStepMetrics = learner.trainStep(batch: batch)
+        if let metrics = lastTrainStepMetrics {
+            tensorBoardPublisher?.publish(
+                step: globalStep,
+                scalars: [
+                    "train/loss": metrics.loss,
+                    "train/q_mean_abs": metrics.meanAbsQ,
+                    "train/q_max_abs": metrics.maxAbsQ,
+                    "train/grad_l2": metrics.gradientL2Norm,
+                    "train/skipped_update": metrics.skippedUpdate ? 1 : 0,
+                ]
+            )
+        }
+    }
+
+    private func episodeLogLine(episode: Int, episodeResult: DQNEpisodeResult, globalStep: Int) -> String {
+        var line =
+            "episode=\(episode) steps=\(episodeResult.steps) reward=\(episodeResult.totalReward) score=\(episodeResult.finalScore) globalStep=\(globalStep)"
+        if let metrics = lastTrainStepMetrics {
+            line +=
+                " trainLoss=\(metrics.loss) qMeanAbs=\(metrics.meanAbsQ) qMaxAbs=\(metrics.maxAbsQ) gradL2=\(metrics.gradientL2Norm) skippedUpdate=\(metrics.skippedUpdate)"
+        }
+        return line
     }
 
     private func maybeResumeFromCheckpoint() throws -> Int {
@@ -135,5 +193,15 @@ struct DQNTrainer {
         let resumedStep = Int(metadata["global_step"] ?? "") ?? 0
         print("resumed from checkpoint=\(standardized) globalStep=\(resumedStep)")
         return resumedStep
+    }
+
+    private static func pythonExecutable() -> String {
+        if let configured = ProcessInfo.processInfo.environment["SNAKE_PYTHON_EXE"], !configured.isEmpty {
+            return configured
+        }
+        if FileManager.default.fileExists(atPath: "/opt/anaconda3/bin/python3") {
+            return "/opt/anaconda3/bin/python3"
+        }
+        return "/usr/bin/python3"
     }
 }

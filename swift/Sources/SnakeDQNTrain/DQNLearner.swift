@@ -80,14 +80,50 @@ final class DQNLearner {
         return (qValues * actionMask).sum(axis: 1)
     }
 
-    @discardableResult
-    func trainStep(batch: DQNBatch) -> Float {
+    func trainStep(batch: DQNBatch) -> DQNTrainStepMetrics {
+        let preUpdateQValues = onlineQNetwork(batch.states)
+        let predictedQ = Self.gatherActionValues(qValues: preUpdateQValues, actions: batch.actions)
+        let meanAbsQ = predictedQ.abs().mean().item(Float.self)
+        let maxAbsQ = predictedQ.abs().max().item(Float.self)
+
         let (values, gradients) = lossAndGrad(
             onlineQNetwork,
             [batch.states, batch.nextStates, batch.actions, batch.rewards, batch.notDoneMask]
         )
-        optimizer.update(model: onlineQNetwork, gradients: gradients)
-        return values[0].item(Float.self)
+        let loss = values[0].item(Float.self)
+        let gradientsFinite = Self.allFinite(parameters: gradients)
+        let lossFinite = loss.isFinite
+        let gradientL2Norm = Self.l2Norm(parameters: gradients)
+
+        let shouldSkipUpdate = !lossFinite || !gradientsFinite || !gradientL2Norm.isFinite
+        if !shouldSkipUpdate {
+            optimizer.update(model: onlineQNetwork, gradients: gradients)
+        }
+
+        return DQNTrainStepMetrics(
+            loss: loss,
+            meanAbsQ: meanAbsQ,
+            maxAbsQ: maxAbsQ,
+            gradientL2Norm: gradientL2Norm,
+            skippedUpdate: shouldSkipUpdate
+        )
+    }
+
+    private static func allFinite(parameters: ModuleParameters) -> Bool {
+        for (_, value) in parameters.flattened() {
+            if !isFinite(value).all().item(Bool.self) {
+                return false
+            }
+        }
+        return true
+    }
+
+    private static func l2Norm(parameters: ModuleParameters) -> Float {
+        var squaredNorm: Float = 0
+        for (_, value) in parameters.flattened() {
+            squaredNorm += value.square().sum().item(Float.self)
+        }
+        return Foundation.sqrt(squaredNorm)
     }
 }
 
