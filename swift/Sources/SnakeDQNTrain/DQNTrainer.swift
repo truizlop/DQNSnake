@@ -22,7 +22,7 @@ struct DQNTrainingConfig {
 
 struct DQNTransition {
     let state: MLXArray
-    let action: Int
+    let action: SnakeAction
     let reward: Float
     let nextState: MLXArray
     let done: Bool
@@ -56,7 +56,7 @@ struct DQNTrainer {
 
             while globalStep < config.totalEnvironmentSteps && stepsInEpisode < config.maxStepsPerEpisode {
                 let action = selectActionPlaceholder(state: state, globalStep: globalStep)
-                let stepResult = try await env.step(action: action)
+                let stepResult = try await env.step(action: action.rawValue)
 
                 frameStack.append(stepResult.observation)
                 let nextState = stateTensor(
@@ -103,11 +103,11 @@ struct DQNTrainer {
         return array.reshaped(1, 4, height, width)
     }
 
-    private func selectActionPlaceholder(state: MLXArray, globalStep: Int) -> Int {
+    private func selectActionPlaceholder(state: MLXArray, globalStep: Int) -> SnakeAction {
         _ = state
         _ = globalStep
         // TODO: Implement epsilon-greedy action selection from onlineQNetwork(state).
-        return Int.random(in: 0...3)
+        return SnakeAction.allCases.randomElement()!
     }
 
     private func onTransitionPlaceholder(_ transition: DQNTransition) {

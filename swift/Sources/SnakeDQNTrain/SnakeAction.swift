@@ -5,9 +5,9 @@
 //  Created by Tomás Ruiz-López on 4/20/26.
 //
 
-enum SnakeAction {
-    case up
-    case left
-    case down
-    case right
+enum SnakeAction: Int, CaseIterable {
+    case up = 0
+    case left = 1
+    case down = 2
+    case right = 3
 }
