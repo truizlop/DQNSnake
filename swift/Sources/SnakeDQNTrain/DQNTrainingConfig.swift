@@ -27,6 +27,10 @@ struct DQNTrainingConfig {
     var batchSize: Int = 32
     var gamma: Float = 0.99
     var learningRate: Float = 2.5e-4
+    var maxConsecutiveSkippedUpdates: Int = 500
+    var maxLossForUpdate: Float = 1_000_000
+    var maxAbsQValue: Float = 1_000_000
+    var maxGradientL2Norm: Float = 1_000_000
 
     // Epsilon-greedy schedule
     var epsilonStart: Float = 1.0

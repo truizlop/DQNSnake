@@ -26,6 +26,10 @@ enum DQNHyperparameterBaseline {
         batchSize: 32,
         gamma: 0.99,
         learningRate: 2.5e-4,
+        maxConsecutiveSkippedUpdates: 500,
+        maxLossForUpdate: 1_000_000,
+        maxAbsQValue: 1_000_000,
+        maxGradientL2Norm: 1_000_000,
         epsilonStart: 1.0,
         epsilonEnd: 0.1,
         epsilonDecaySteps: 100_000

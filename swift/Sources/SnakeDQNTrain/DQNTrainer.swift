@@ -14,6 +14,7 @@ struct DQNTrainer {
     var lastTrainStepMetrics: DQNTrainStepMetrics?
     var tensorBoardPublisher: TensorBoardMetricsPublisher?
     var structuredLogger: DQNStructuredLogger?
+    var stabilityTracker: DQNStabilityTracker
 
     init(env: SnakeEnv, config: DQNTrainingConfig = DQNTrainingConfig()) {
         self.env = env
@@ -46,6 +47,7 @@ struct DQNTrainer {
         self.lastTrainStepMetrics = nil
         self.tensorBoardPublisher = nil
         self.structuredLogger = nil
+        self.stabilityTracker = DQNStabilityTracker()
     }
 
     mutating func run() async throws {
@@ -77,6 +79,10 @@ struct DQNTrainer {
                 "replay_sampling_strategy": "\(config.replaySamplingStrategy)",
                 "train_every": "\(config.trainEvery)",
                 "batch_size": "\(config.batchSize)",
+                "max_consecutive_skipped_updates": "\(config.maxConsecutiveSkippedUpdates)",
+                "max_loss_for_update": "\(config.maxLossForUpdate)",
+                "max_abs_q_value": "\(config.maxAbsQValue)",
+                "max_gradient_l2_norm": "\(config.maxGradientL2Norm)",
             ]
         )
 
@@ -217,7 +223,7 @@ struct DQNTrainer {
 
     private mutating func applyTrainingSchedule(globalStep: Int) throws {
         if shouldOptimize(globalStep: globalStep) {
-            optimizeFromReplay(globalStep: globalStep)
+            try optimizeFromReplay(globalStep: globalStep)
         }
         if shouldSyncTarget(globalStep: globalStep) {
             learner.syncTargetFromOnline()
@@ -237,12 +243,14 @@ struct DQNTrainer {
         }
     }
 
-    private mutating func optimizeFromReplay(globalStep: Int) {
+    private mutating func optimizeFromReplay(globalStep: Int) throws {
         let startedAt = Date()
         let transitions = replayBuffer.sample(batchSize: config.batchSize)
         let batch = DQNBatch(transitions: transitions)
         lastTrainStepMetrics = learner.trainStep(batch: batch)
         if let metrics = lastTrainStepMetrics {
+            stabilityTracker.record(trainStepMetrics: metrics)
+            try enforceStabilityGuards(metrics: metrics, globalStep: globalStep)
             let optimizeDuration = Float(Date().timeIntervalSince(startedAt))
             tensorBoardPublisher?.publish(
                 step: globalStep,
@@ -252,6 +260,7 @@ struct DQNTrainer {
                     "train/q_max_abs": metrics.maxAbsQ,
                     "train/grad_l2": metrics.gradientL2Norm,
                     "train/skipped_update": metrics.skippedUpdate ? 1 : 0,
+                    "train/consecutive_skipped_updates": Float(stabilityTracker.consecutiveSkippedUpdates),
                     "train/optimize_duration_s": optimizeDuration,
                 ]
             )
@@ -264,12 +273,65 @@ struct DQNTrainer {
                     "q_max_abs": "\(metrics.maxAbsQ)",
                     "grad_l2": "\(metrics.gradientL2Norm)",
                     "skipped_update": "\(metrics.skippedUpdate ? 1 : 0)",
+                    "consecutive_skipped_updates": "\(stabilityTracker.consecutiveSkippedUpdates)",
                     "optimize_duration_s": "\(optimizeDuration)",
                     "batch_size": "\(config.batchSize)",
                     "replay_size": "\(replayBuffer.count)",
                 ]
             )
         }
+    }
+
+    private func enforceStabilityGuards(metrics: DQNTrainStepMetrics, globalStep: Int) throws {
+        if metrics.loss.isFinite, metrics.loss > config.maxLossForUpdate {
+            throwAndLogGuardError(
+                .lossExceeded(limit: config.maxLossForUpdate, observed: metrics.loss, step: globalStep),
+                globalStep: globalStep
+            )
+        }
+        if metrics.maxAbsQ.isFinite, metrics.maxAbsQ > config.maxAbsQValue {
+            throwAndLogGuardError(
+                .qValueExceeded(limit: config.maxAbsQValue, observed: metrics.maxAbsQ, step: globalStep),
+                globalStep: globalStep
+            )
+        }
+        if metrics.gradientL2Norm.isFinite, metrics.gradientL2Norm > config.maxGradientL2Norm {
+            throwAndLogGuardError(
+                .gradientNormExceeded(
+                    limit: config.maxGradientL2Norm,
+                    observed: metrics.gradientL2Norm,
+                    step: globalStep
+                ),
+                globalStep: globalStep
+            )
+        }
+        if stabilityTracker.consecutiveSkippedUpdates >= config.maxConsecutiveSkippedUpdates {
+            throwAndLogGuardError(
+                .consecutiveSkippedUpdatesExceeded(
+                    limit: config.maxConsecutiveSkippedUpdates,
+                    observed: stabilityTracker.consecutiveSkippedUpdates,
+                    step: globalStep
+                ),
+                globalStep: globalStep
+            )
+        }
+    }
+
+    private func throwAndLogGuardError(_ error: DQNTrainingGuardError, globalStep: Int) throws -> Never {
+        tensorBoardPublisher?.publish(
+            step: globalStep,
+            scalars: [
+                "train/stability_guard_triggered": 1,
+            ]
+        )
+        structuredLogger?.log(
+            event: "stability_guard_triggered",
+            step: globalStep,
+            fields: [
+                "reason": error.localizedDescription,
+            ]
+        )
+        throw error
     }
 
     private func episodeLogLine(episode: Int, episodeResult: DQNEpisodeResult, globalStep: Int) -> String {

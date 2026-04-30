@@ -122,6 +122,8 @@ Logged scalar groups:
 - `train/action_down`
 - `train/action_right`
 - `train/optimize_duration_s`
+- `train/consecutive_skipped_updates`
+- `train/stability_guard_triggered`
 - `eval/avg_reward`
 - `eval/avg_score`
 
@@ -134,6 +136,7 @@ Structured log event stream (`SNAKE_OBS_LOG_PATH`) includes:
 - `target_sync`
 - `checkpoint_periodic_saved`
 - `checkpoint_best_saved`
+- `stability_guard_triggered`
 
 ## Swift API
 
@@ -196,5 +199,9 @@ Current `snakeV1` values:
 - `epsilonDecaySteps`: `100_000`
 - `evalEveryEpisodes`: `25`
 - `evalEpisodes`: `5`
+- `maxConsecutiveSkippedUpdates`: `500`
+- `maxLossForUpdate`: `1_000_000`
+- `maxAbsQValue`: `1_000_000`
+- `maxGradientL2Norm`: `1_000_000`
 
 Runtime env vars still override these defaults at launch.
