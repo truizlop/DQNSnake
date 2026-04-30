@@ -25,24 +25,8 @@ final class DQNLearner {
             let rewards = arrays[3]
             let notDoneMask = arrays[4]
 
-            // DQN is trained against Q(s, a) for the action actually taken in each transition.
-            // The network outputs one Q-value per action for each state: [B, actionCount].
-            // We need to "gather" one value per row using the sampled action index for that row.
-            //
-            // MLX does not provide a direct batched gather API in this codepath, so we build an
-            // explicit one-hot action mask and use it to select the chosen action value:
-            // 1) actionRange: [1, actionCount] = [0, 1, ..., actionCount-1]
-            // 2) compare against actions reshaped to [B, 1] to produce actionMask [B, actionCount]
-            // 3) multiply qValues * actionMask to keep only the selected action per row
-            // 4) sum across the action axis -> predictedQ [B], where each entry is Q(s_i, a_i)
-            //
-            // This yields the exact scalar target we regress in DQN for each transition, while
-            // keeping the operation fully vectorized across the minibatch.
             let qValues = model(states) // [B, actionCount]
-            let actionSpace = qValues.shape[1]
-            let actionRange = MLXArray(0 ..< actionSpace).reshaped(1, actionSpace)
-            let actionMask = (actionRange .== actions.reshaped(-1, 1)).asType(qValues.dtype)
-            let predictedQ = (qValues * actionMask).sum(axis: 1)
+            let predictedQ = Self.gatherActionValues(qValues: qValues, actions: actions)
 
             let nextQValues = targetQNetwork(nextStates)
             let maxNextQ = nextQValues.max(axis: 1)
@@ -60,6 +44,26 @@ final class DQNLearner {
 
     func syncTargetFromOnline() {
         targetQNetwork.update(parameters: onlineQNetwork.parameters())
+    }
+
+    // DQN is trained against Q(s, a) for the action actually taken in each transition.
+    // The network outputs one Q-value per action for each state: [B, actionCount].
+    // We need to "gather" one value per row using the sampled action index for that row.
+    //
+    // MLX does not provide a direct batched gather API in this codepath, so we build an
+    // explicit one-hot action mask and use it to select the chosen action value:
+    // 1) actionRange: [1, actionCount] = [0, 1, ..., actionCount-1]
+    // 2) compare against actions reshaped to [B, 1] to produce actionMask [B, actionCount]
+    // 3) multiply qValues * actionMask to keep only the selected action per row
+    // 4) sum across the action axis -> predictedQ [B], where each entry is Q(s_i, a_i)
+    //
+    // This yields the exact scalar target we regress in DQN for each transition, while
+    // keeping the operation fully vectorized across the minibatch.
+    private static func gatherActionValues(qValues: MLXArray, actions: MLXArray) -> MLXArray {
+        let actionSpace = qValues.shape[1]
+        let actionRange = MLXArray(0 ..< actionSpace).reshaped(1, actionSpace)
+        let actionMask = (actionRange .== actions.reshaped(-1, 1)).asType(qValues.dtype)
+        return (qValues * actionMask).sum(axis: 1)
     }
 
     @discardableResult
