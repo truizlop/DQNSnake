@@ -39,7 +39,7 @@ struct DQNTrainer {
             var state = stateTensor(from: frameStack.stacked(), width: initial.width, height: initial.height)
 
             while globalStep < config.totalEnvironmentSteps && stepsInEpisode < config.maxStepsPerEpisode {
-                let action = selectActionPlaceholder(state: state, globalStep: globalStep)
+                let action = selectAction(state: state, globalStep: globalStep)
                 let stepResult = try await env.step(action: action.rawValue)
 
                 frameStack.append(stepResult.observation)
@@ -61,7 +61,7 @@ struct DQNTrainer {
 
                 maybeOptimizeFromReplay(globalStep: globalStep)
 
-                maybeSyncTargetNetworkPlaceholder(globalStep: globalStep)
+                maybeSyncTargetNetwork(globalStep: globalStep)
 
                 state = nextState
                 globalStep += 1
@@ -84,7 +84,7 @@ struct DQNTrainer {
         return array.reshaped(1, 4, height, width)
     }
 
-    private func selectActionPlaceholder(state: MLXArray, globalStep: Int) -> SnakeAction {
+    private func selectAction(state: MLXArray, globalStep: Int) -> SnakeAction {
         let epsilon = epsilonValue(globalStep: globalStep)
         if Float.random(in: 0..<1) < epsilon {
             return SnakeAction.allCases.randomElement()!
@@ -119,7 +119,7 @@ struct DQNTrainer {
         _ = learner.trainStep(batch: batch)
     }
 
-    private func maybeSyncTargetNetworkPlaceholder(globalStep: Int) {
+    private func maybeSyncTargetNetwork(globalStep: Int) {
         guard
             config.targetSyncEvery > 0,
             globalStep > 0, globalStep % config.targetSyncEvery == 0

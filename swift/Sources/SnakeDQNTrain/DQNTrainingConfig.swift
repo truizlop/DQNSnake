@@ -6,7 +6,7 @@ struct DQNTrainingConfig {
     var maxStepsPerEpisode: Int = 10_000
     var replayBufferCapacity: Int = 100_000
 
-    // DQN scheduling knobs (placeholders for your implementation)
+    // DQN scheduling knobs
     var warmupSteps: Int = 5_000
     var trainEvery: Int = 4
     var targetSyncEvery: Int = 10_000
@@ -14,7 +14,7 @@ struct DQNTrainingConfig {
     var gamma: Float = 0.99
     var learningRate: Float = 2.5e-4
 
-    // Epsilon-greedy schedule placeholders
+    // Epsilon-greedy schedule
     var epsilonStart: Float = 1.0
     var epsilonEnd: Float = 0.1
     var epsilonDecaySteps: Int = 1_000_000
