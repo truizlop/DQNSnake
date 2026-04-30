@@ -6,3 +6,6 @@ swift/.build/
 __pycache__/
 *.pyc
 .pytest_cache/
+*.xcuserstate
+*.xcworkspacedata
+swift/.swiftpm/xcode/xcuserdata/tomasruizlopez.xcuserdatad/xcschemes/xcschememanagement.plist

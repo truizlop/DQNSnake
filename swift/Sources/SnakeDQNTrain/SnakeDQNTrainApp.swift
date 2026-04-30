@@ -12,7 +12,6 @@ struct SnakeDQNTrainApp {
         let steps = Int(ProcessInfo.processInfo.environment["SNAKE_STEPS"] ?? "20") ?? 20
         let maxEpisodeSteps = Int(ProcessInfo.processInfo.environment["SNAKE_MAX_EPISODE_STEPS"] ?? "2000") ?? 2_000
 
-        // DQN training skeleton wired to SnakeEnv. Algorithm internals are TODOs.
         var trainer = DQNTrainer(
             env: SnakeEnv(usePythonBridge: true, pythonModulePath: pythonDir),
             config: DQNTrainingConfig(
