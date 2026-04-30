@@ -174,3 +174,27 @@ Set `SNAKE_SEED` to a fixed integer to improve run-to-run reproducibility. When 
 - Swift replay buffer sampling uses a deterministic PRNG.
 - Swift epsilon-greedy exploration sampling uses a deterministic PRNG.
 - Python env is seeded, and each `reset()` uses `seed + reset_count` for deterministic episode progression.
+
+## Hyperparameter baseline
+
+The trainer now uses a named baseline profile: `DQNHyperparameterBaseline.snakeV1` in
+`swift/Sources/SnakeDQNTrain/DQNHyperparameterBaseline.swift`.
+
+Current `snakeV1` values:
+- `totalEnvironmentSteps`: `200_000`
+- `maxStepsPerEpisode`: `2_000`
+- `replayBufferCapacity`: `100_000`
+- `replaySamplingStrategy`: `withReplacement`
+- `warmupSteps`: `5_000`
+- `trainEvery`: `4`
+- `targetSyncEvery`: `10_000`
+- `batchSize`: `32`
+- `learningRate`: `2.5e-4`
+- `gamma`: `0.99`
+- `epsilonStart`: `1.0`
+- `epsilonEnd`: `0.1`
+- `epsilonDecaySteps`: `100_000`
+- `evalEveryEpisodes`: `25`
+- `evalEpisodes`: `5`
+
+Runtime env vars still override these defaults at launch.
