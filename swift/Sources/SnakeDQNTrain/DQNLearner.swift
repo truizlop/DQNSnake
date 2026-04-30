@@ -90,3 +90,5 @@ final class DQNLearner {
         return values[0].item(Float.self)
     }
 }
+
+extension DQNLearner: DQNModelCheckpointSaving {}

@@ -1,5 +1,9 @@
 import Foundation
 
+protocol DQNModelCheckpointSaving {
+    func saveOnlineModel(to url: URL, metadata: [String: String]) throws
+}
+
 struct DQNCheckpointManager {
     private let directoryURL: URL
     private let checkpointEverySteps: Int
@@ -17,20 +21,23 @@ struct DQNCheckpointManager {
         self.bestScore = nil
     }
 
-    mutating func maybeSaveStepCheckpoint(learner: DQNLearner, globalStep: Int) throws {
+    mutating func maybeSaveStepCheckpoint(
+        saver: some DQNModelCheckpointSaving,
+        globalStep: Int
+    ) throws {
         guard checkpointEverySteps > 0, globalStep > 0, globalStep % checkpointEverySteps == 0 else {
             return
         }
         try createDirectoryIfNeeded()
         let url = directoryURL.appendingPathComponent("model_step_\(globalStep).safetensors")
-        try learner.saveOnlineModel(
+        try saver.saveOnlineModel(
             to: url,
             metadata: ["global_step": "\(globalStep)", "kind": "periodic"]
         )
     }
 
     mutating func maybeSaveBestCheckpoint(
-        learner: DQNLearner,
+        saver: some DQNModelCheckpointSaving,
         episodeResult: DQNEpisodeResult,
         episode: Int,
         globalStep: Int
@@ -44,7 +51,7 @@ struct DQNCheckpointManager {
         bestScore = episodeResult.finalScore
         try createDirectoryIfNeeded()
         let url = directoryURL.appendingPathComponent("model_best.safetensors")
-        try learner.saveOnlineModel(
+        try saver.saveOnlineModel(
             to: url,
             metadata: [
                 "global_step": "\(globalStep)",

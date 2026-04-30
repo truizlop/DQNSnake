@@ -30,6 +30,7 @@ let package = Package(
                 .product(name: "MLXRandom", package: "mlx-swift")
             ]
         ),
-        .testTarget(name: "SnakeEnvTests", dependencies: ["SnakeEnv"])
+        .testTarget(name: "SnakeEnvTests", dependencies: ["SnakeEnv"]),
+        .testTarget(name: "SnakeDQNTrainTests", dependencies: ["SnakeDQNTrain"])
     ]
 )

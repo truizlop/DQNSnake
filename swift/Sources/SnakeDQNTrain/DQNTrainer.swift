@@ -59,7 +59,7 @@ struct DQNTrainer {
             )
 
             try checkpointManager.maybeSaveBestCheckpoint(
-                learner: learner,
+                saver: learner,
                 episodeResult: episodeResult,
                 episode: episode,
                 globalStep: globalStep
@@ -108,7 +108,7 @@ struct DQNTrainer {
         if shouldSyncTarget(globalStep: globalStep) {
             learner.syncTargetFromOnline()
         }
-        try checkpointManager.maybeSaveStepCheckpoint(learner: learner, globalStep: globalStep)
+        try checkpointManager.maybeSaveStepCheckpoint(saver: learner, globalStep: globalStep)
     }
 
     private func selectAction(state: MLXArray, globalStep: Int) -> SnakeAction {
