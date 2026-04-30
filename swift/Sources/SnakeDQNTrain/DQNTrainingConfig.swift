@@ -10,6 +10,8 @@ struct DQNTrainingConfig {
     var checkpointEverySteps: Int = 10_000
     var saveBestCheckpoint: Bool = true
     var resumeCheckpointPath: String? = nil
+    var evalEveryEpisodes: Int = 0
+    var evalEpisodes: Int = 5
 
     // DQN scheduling knobs
     var warmupSteps: Int = 5_000

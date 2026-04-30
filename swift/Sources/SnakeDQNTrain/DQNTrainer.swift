@@ -9,6 +9,7 @@ struct DQNTrainer {
     let learner: DQNLearner
     let explorationPolicy: EpsilonGreedyPolicy
     let episodeRunner: DQNEpisodeRunner
+    let evaluator: DQNEvaluator
     var checkpointManager: DQNCheckpointManager
 
     init(env: SnakeEnv, config: DQNTrainingConfig = DQNTrainingConfig()) {
@@ -25,6 +26,10 @@ struct DQNTrainer {
             epsilonDecaySteps: config.epsilonDecaySteps
         )
         self.episodeRunner = DQNEpisodeRunner(
+            env: env,
+            maxStepsPerEpisode: config.maxStepsPerEpisode
+        )
+        self.evaluator = DQNEvaluator(
             env: env,
             maxStepsPerEpisode: config.maxStepsPerEpisode
         )
@@ -63,6 +68,18 @@ struct DQNTrainer {
             print(
                 "episode=\(episode) steps=\(episodeResult.steps) reward=\(episodeResult.totalReward) score=\(episodeResult.finalScore) globalStep=\(globalStep)"
             )
+
+            if shouldEvaluate(episode: episode) {
+                let evaluation = try await evaluator.evaluate(
+                    episodes: config.evalEpisodes,
+                    selectAction: { state in
+                        learner.greedyAction(for: state)
+                    }
+                )
+                print(
+                    "eval episode=\(episode) episodes=\(evaluation.episodes) avgReward=\(evaluation.averageReward) avgScore=\(evaluation.averageScore)"
+                )
+            }
         }
     }
 
@@ -76,6 +93,12 @@ struct DQNTrainer {
         config.targetSyncEvery > 0
             && globalStep > 0
             && globalStep % config.targetSyncEvery == 0
+    }
+
+    private func shouldEvaluate(episode: Int) -> Bool {
+        config.evalEveryEpisodes > 0
+            && config.evalEpisodes > 0
+            && episode % config.evalEveryEpisodes == 0
     }
 
     private mutating func applyTrainingSchedule(globalStep: Int) throws {
