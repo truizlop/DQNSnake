@@ -1,15 +1,25 @@
 # DQNSnake
 
-Single-player Snake environment setup with a Swift bridge, ready for DQN work.
+Single-player Snake training stack with:
+- Python `gym-snake` environment
+- Swift `SnakeEnv` bridge actor
+- Swift DQN training loop (MLX/MLXNN/MLXOptimizers)
+- Checkpointing, resume, evaluation, and TensorBoard metric streaming
 
-## What is implemented
+## Current capabilities
 
-- Python snake environment adapter around `gym-snake`
-- Python bridge surface (`create_env`, `reset`, `step`, `get_frame`, `get_score`, `is_done`)
-- Swift `SnakeEnv` actor API controlling the Python environment through a JSON subprocess bridge
-- Frame stacking on both Python and Swift sides
-- Visual gameplay runners (Python-controlled and Swift-controlled)
-- MLX training scaffold target (`snake-dqn-train`) for upcoming DQN implementation
+- Python snake adapter around `gym-snake`
+- Typed Swift↔Python JSON bridge protocol payloads
+- Swift `SnakeEnv` actor API
+- DQN components in Swift:
+  - replay buffer (explicit sampling strategy)
+  - epsilon-greedy exploration policy
+  - online/target network training
+  - periodic target sync
+  - checkpoint save/load (`.safetensors`)
+  - periodic greedy evaluation loop
+  - training quality checks (loss/Q scale/gradient norm + skip-on-invalid update)
+- TensorBoard integration from Swift training process
 
 ## Repository structure
 
@@ -17,14 +27,16 @@ Single-player Snake environment setup with a Swift bridge, ready for DQN work.
   - `snake_env_adapter.py`: normalized env API, score tracking, frame grid conversion, reward mapping, initial snake length setup
   - `bridge.py`: simple callable bridge module
   - `bridge_server.py`: line-delimited JSON server used by Swift bridge
+  - `tensorboard_stream.py`: JSON scalar stream -> TensorBoard event files
 - `swift/`
   - `Sources/SnakeEnv/`: actor API + bridge client
   - `Sources/SnakeEnvCLI/`: Swift runner for environment stepping
-  - `Sources/SnakeDQNTrain/`: DQN + MLX scaffold target
+  - `Sources/SnakeDQNTrain/`: DQN training pipeline
 - `tests/`
   - `smoke_snake_env.py`: smoke runner
   - `visual_snake_env.py`: pygame visual runner
   - `test_snake_env_adapter.py`: adapter and frame stack tests
+  - `swift/Tests/SnakeDQNTrainTests/`: DQN unit tests (checkpoint manager, policy behavior)
 
 ## Data/reward contract
 
@@ -37,7 +49,7 @@ Single-player Snake environment setup with a Swift bridge, ready for DQN work.
   - `+1` apple
   - `0` normal step
   - `-1` terminal collision
-- Episode score is cumulative reward.
+- `score` returned by env is cumulative reward.
 
 ## Run commands
 
@@ -51,16 +63,52 @@ From repo root:
   - `SNAKE_CONTROL=human make run-visual` for keyboard control (arrows, `R`, `Esc`/`Q`)
 - `make run-swift`: Swift-controlled rollout via bridge
 - `make run-swift-visual`: Swift-controlled rollout + pygame rendering
-- `make run-dqn`: run DQN scaffold target
+- `make run-dqn`: run Swift DQN trainer target
 
 Useful env vars:
 
 - `SNAKE_STEPS` (default `30` for `run-swift`, `20` for `run-dqn`)
 - `SNAKE_FPS` (visual modes)
 - `SNAKE_MAX_STEPS` (visual Python loop)
+- `SNAKE_MAX_EPISODE_STEPS` (Swift DQN trainer)
 - `SNAKE_PYTHON_EXE` (Python binary for Swift bridge; defaults to `/opt/anaconda3/bin/python3` when available)
 - `SNAKE_PYTHON_DIR` (Python module directory; defaults to `python/`)
-- `SNAKE_ENABLE_MLX=1` to enable MLX tensor path in `run-dqn`
+- `SNAKE_RESUME_CHECKPOINT` (path to `.safetensors` checkpoint to resume from)
+
+Evaluation env vars:
+- `SNAKE_EVAL_EVERY_EPISODES` (default `0`, disabled)
+- `SNAKE_EVAL_EPISODES` (default `5`)
+
+TensorBoard env vars:
+- `SNAKE_TB_ENABLE` (`1` default)
+- `SNAKE_TB_LAUNCH` (`1` default; auto-launches TensorBoard process)
+- `SNAKE_TB_LOGDIR` (default `runs/snake_dqn`)
+- `SNAKE_TB_PORT` (default `6006`)
+
+## TensorBoard usage
+
+`snake-dqn-train` can publish metrics directly to TensorBoard event files through `python/tensorboard_stream.py`.
+
+Install TensorBoard in your Python environment:
+- `python3 -m pip install tensorboard`
+
+Typical run:
+- `make run-dqn`
+
+If `SNAKE_TB_ENABLE=1` and `SNAKE_TB_LAUNCH=1`, TensorBoard is started automatically and available at:
+- `http://localhost:6006` (or `SNAKE_TB_PORT`)
+
+Logged scalar groups:
+- `train/loss`
+- `train/q_mean_abs`
+- `train/q_max_abs`
+- `train/grad_l2`
+- `train/skipped_update`
+- `train/episode_reward`
+- `train/episode_score`
+- `train/episode_steps`
+- `eval/avg_reward`
+- `eval/avg_score`
 
 ## Swift API
 
@@ -72,20 +120,25 @@ Useful env vars:
 - `isDone() async -> Bool`
 - `render() async throws`
 
-## Current caveats
+## Training behavior summary
+
+- Replay buffer sampling is explicit:
+  - `withReplacement`
+  - `withoutReplacement`
+- Checkpointing:
+  - periodic: `model_step_<globalStep>.safetensors`
+  - best: `model_best.safetensors` (currently best by training episode score)
+- Resume:
+  - loads online model from checkpoint
+  - syncs target model from loaded online model
+  - resumes `global_step` from checkpoint metadata when present
+- Update quality checks:
+  - tracks loss, Q scale, gradient L2 norm
+  - skips optimizer update if loss/gradients are non-finite
+
+## Current caveats / notes
 
 - `gym-snake` upstream uses old Gym APIs and emits deprecation warnings.
 - Reversing direction into the snake body causes immediate terminal state (confirmed behavior).
-- `mlx-swift` command-line builds may fail to run GPU/Metal shader paths in pure SwiftPM CLI workflows.
-  - The DQN scaffold defaults to env-only mode unless `SNAKE_ENABLE_MLX=1`.
-  - For full MLX GPU workflows, prefer Xcode/xcodebuild integration.
-
-## Next step
-
-Implement DQN in `swift/Sources/SnakeDQNTrain/`:
-
-- Q-network (`MLXNN`)
-- replay buffer
-- epsilon-greedy policy
-- target network updates
-- optimizer/loss training step (`MLXOptimizers`)
+- MLX runtime requirements (Metal / bundled libs) still apply depending on your local setup.
+- Optimizer state checkpoint/resume is not yet implemented (model weights resume is implemented).
