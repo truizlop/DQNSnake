@@ -36,7 +36,7 @@ class DQNModel: Module {
     func callAsFunction(_ input: MLXArray) -> MLXArray {
         var x = relu(conv1(input))
         x = relu(conv2(x))
-        x = x.flattened()
+        x = x.flattened(start: 1)
         x = relu(dense(x))
         return output(x)
     }

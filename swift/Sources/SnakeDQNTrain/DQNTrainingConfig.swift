@@ -12,6 +12,7 @@ struct DQNTrainingConfig {
     var targetSyncEvery: Int = 10_000
     var batchSize: Int = 32
     var gamma: Float = 0.99
+    var learningRate: Float = 2.5e-4
 
     // Epsilon-greedy schedule placeholders
     var epsilonStart: Float = 1.0

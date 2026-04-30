@@ -1,5 +1,6 @@
 import Foundation
 import MLX
+import MLXNN
 import SnakeEnv
 
 struct DQNTrainer {
@@ -8,6 +9,7 @@ struct DQNTrainer {
     let targetQNetwork: DQNModel
     var config: DQNTrainingConfig
     var replayBuffer: ReplayBuffer
+    let learner: DQNLearner
 
     init(env: SnakeEnv, config: DQNTrainingConfig = DQNTrainingConfig()) {
         self.env = env
@@ -15,6 +17,12 @@ struct DQNTrainer {
         self.onlineQNetwork = DQNModel()
         self.targetQNetwork = DQNModel()
         self.replayBuffer = ReplayBuffer(capacity: config.replayBufferCapacity)
+        self.learner = DQNLearner(
+            onlineQNetwork: self.onlineQNetwork,
+            targetQNetwork: self.targetQNetwork,
+            gamma: config.gamma,
+            learningRate: config.learningRate
+        )
     }
 
     mutating func run() async throws {
@@ -51,8 +59,7 @@ struct DQNTrainer {
 
                 replayBuffer.append(transition)
 
-                // TODO: Sample replay + optimize online Q-network here.
-                maybeTrainPlaceholder(globalStep: globalStep, replayBufferCount: replayBuffer.count)
+                maybeOptimizeFromReplay(globalStep: globalStep)
 
                 // TODO: Periodically copy online params -> target network here.
                 maybeSyncTargetNetworkPlaceholder(globalStep: globalStep)
@@ -100,9 +107,7 @@ struct DQNTrainer {
         return min(max(epsilon, min(config.epsilonStart, config.epsilonEnd)), max(config.epsilonStart, config.epsilonEnd))
     }
 
-    private func maybeTrainPlaceholder(globalStep: Int, replayBufferCount: Int) {
-        _ = globalStep
-        _ = replayBufferCount
+    private func maybeOptimizeFromReplay(globalStep: Int) {
         guard
             globalStep >= config.warmupSteps,
             globalStep % config.trainEvery == 0,
@@ -110,9 +115,9 @@ struct DQNTrainer {
         else {
             return
         }
-        let batch = replayBuffer.sample(batchSize: config.batchSize)
-        _ = batch
-        // TODO: if replayBuffer has enough samples, sample minibatch and run one gradient step.
+        let transitions = replayBuffer.sample(batchSize: config.batchSize)
+        let batch = DQNBatch(transitions: transitions)
+        _ = learner.trainStep(batch: batch)
     }
 
     private func maybeSyncTargetNetworkPlaceholder(globalStep: Int) {
