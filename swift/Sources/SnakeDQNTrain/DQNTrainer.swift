@@ -36,7 +36,7 @@ struct DQNTrainer {
     }
 
     mutating func run() async throws {
-        var globalStep = 0
+        var globalStep = try maybeResumeFromCheckpoint()
         var episode = 0
 
         while globalStep < config.totalEnvironmentSteps {
@@ -99,5 +99,18 @@ struct DQNTrainer {
         let transitions = replayBuffer.sample(batchSize: config.batchSize)
         let batch = DQNBatch(transitions: transitions)
         _ = learner.trainStep(batch: batch)
+    }
+
+    private func maybeResumeFromCheckpoint() throws -> Int {
+        guard let resumePath = config.resumeCheckpointPath, !resumePath.isEmpty else {
+            return 0
+        }
+
+        let standardized = (resumePath as NSString).standardizingPath
+        let url = URL(fileURLWithPath: standardized)
+        let metadata = try learner.loadOnlineModel(from: url)
+        let resumedStep = Int(metadata["global_step"] ?? "") ?? 0
+        print("resumed from checkpoint=\(standardized) globalStep=\(resumedStep)")
+        return resumedStep
     }
 }

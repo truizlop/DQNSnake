@@ -51,6 +51,15 @@ final class DQNLearner {
         try save(arrays: arrays, metadata: metadata, url: url)
     }
 
+    @discardableResult
+    func loadOnlineModel(from url: URL) throws -> [String: String] {
+        let (arrays, metadata) = try loadArraysAndMetadata(url: url)
+        let parameters = ModuleParameters.unflattened(arrays)
+        onlineQNetwork.update(parameters: parameters)
+        syncTargetFromOnline()
+        return metadata
+    }
+
     // DQN is trained against Q(s, a) for the action actually taken in each transition.
     // The network outputs one Q-value per action for each state: [B, actionCount].
     // We need to "gather" one value per row using the sampled action index for that row.
