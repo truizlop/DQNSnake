@@ -7,12 +7,14 @@ struct DQNTrainer {
     let onlineQNetwork: DQNModel
     let targetQNetwork: DQNModel
     var config: DQNTrainingConfig
+    var replayBuffer: ReplayBuffer
 
     init(env: SnakeEnv, config: DQNTrainingConfig = DQNTrainingConfig()) {
         self.env = env
         self.config = config
         self.onlineQNetwork = DQNModel()
         self.targetQNetwork = DQNModel()
+        self.replayBuffer = ReplayBuffer(capacity: config.replayBufferCapacity)
     }
 
     mutating func run() async throws {
@@ -47,11 +49,10 @@ struct DQNTrainer {
                     done: stepResult.done
                 )
 
-                // TODO: Store into replay buffer.
-                onTransitionPlaceholder(transition)
+                replayBuffer.append(transition)
 
                 // TODO: Sample replay + optimize online Q-network here.
-                maybeTrainPlaceholder(globalStep: globalStep)
+                maybeTrainPlaceholder(globalStep: globalStep, replayBufferCount: replayBuffer.count)
 
                 // TODO: Periodically copy online params -> target network here.
                 maybeSyncTargetNetworkPlaceholder(globalStep: globalStep)
@@ -84,13 +85,18 @@ struct DQNTrainer {
         return SnakeAction.allCases.randomElement()!
     }
 
-    private func onTransitionPlaceholder(_ transition: DQNTransition) {
-        _ = transition
-        // TODO: replayBuffer.append(transition)
-    }
-
-    private func maybeTrainPlaceholder(globalStep: Int) {
+    private func maybeTrainPlaceholder(globalStep: Int, replayBufferCount: Int) {
         _ = globalStep
+        _ = replayBufferCount
+        guard
+            globalStep >= config.warmupSteps,
+            globalStep % config.trainEvery == 0,
+            replayBuffer.canSample(batchSize: config.batchSize)
+        else {
+            return
+        }
+        let batch = replayBuffer.sample(batchSize: config.batchSize)
+        _ = batch
         // TODO: if replayBuffer has enough samples, sample minibatch and run one gradient step.
     }
 
