@@ -7,12 +7,18 @@ struct DQNTrainer {
     var config: DQNTrainingConfig
     var replayBuffer: ReplayBuffer
     let learner: DQNLearner
+    let explorationPolicy: EpsilonGreedyPolicy
 
     init(env: SnakeEnv, config: DQNTrainingConfig = DQNTrainingConfig()) {
         self.env = env
         self.config = config
         self.replayBuffer = ReplayBuffer(capacity: config.replayBufferCapacity)
         self.learner = DQNLearner(gamma: config.gamma, learningRate: config.learningRate)
+        self.explorationPolicy = EpsilonGreedyPolicy(
+            epsilonStart: config.epsilonStart,
+            epsilonEnd: config.epsilonEnd,
+            epsilonDecaySteps: config.epsilonDecaySteps
+        )
     }
 
     mutating func run() async throws {
@@ -75,23 +81,10 @@ struct DQNTrainer {
     }
 
     private func selectAction(state: MLXArray, globalStep: Int) -> SnakeAction {
-        let epsilon = epsilonValue(globalStep: globalStep)
-        if Float.random(in: 0..<1) < epsilon {
-            return SnakeAction.allCases.randomElement()!
-        }
-
-        return learner.greedyAction(for: state)
-    }
-
-    private func epsilonValue(globalStep: Int) -> Float {
-        guard config.epsilonDecaySteps > 0 else {
-            return config.epsilonEnd
-        }
-
-        let clampedStep = min(max(globalStep, 0), config.epsilonDecaySteps)
-        let progress = Float(clampedStep) / Float(config.epsilonDecaySteps)
-        let epsilon = config.epsilonStart + (config.epsilonEnd - config.epsilonStart) * progress
-        return min(max(epsilon, min(config.epsilonStart, config.epsilonEnd)), max(config.epsilonStart, config.epsilonEnd))
+        explorationPolicy.selectAction(
+            globalStep: globalStep,
+            greedyAction: learner.greedyAction(for: state)
+        )
     }
 
     private func maybeOptimizeFromReplay(globalStep: Int) {
