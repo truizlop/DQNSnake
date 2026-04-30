@@ -1,0 +1,19 @@
+import Foundation
+
+struct DQNTrainingConfig {
+    // Overall control
+    var totalEnvironmentSteps: Int = 200_000
+    var maxStepsPerEpisode: Int = 10_000
+
+    // DQN scheduling knobs (placeholders for your implementation)
+    var warmupSteps: Int = 5_000
+    var trainEvery: Int = 4
+    var targetSyncEvery: Int = 10_000
+    var batchSize: Int = 32
+    var gamma: Float = 0.99
+
+    // Epsilon-greedy schedule placeholders
+    var epsilonStart: Float = 1.0
+    var epsilonEnd: Float = 0.1
+    var epsilonDecaySteps: Int = 1_000_000
+}
