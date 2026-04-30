@@ -61,7 +61,6 @@ struct DQNTrainer {
 
                 maybeOptimizeFromReplay(globalStep: globalStep)
 
-                // TODO: Periodically copy online params -> target network here.
                 maybeSyncTargetNetworkPlaceholder(globalStep: globalStep)
 
                 state = nextState
@@ -121,7 +120,12 @@ struct DQNTrainer {
     }
 
     private func maybeSyncTargetNetworkPlaceholder(globalStep: Int) {
-        _ = globalStep
-        // TODO: if globalStep % targetSyncEvery == 0, copy online weights to target network.
+        guard
+            config.targetSyncEvery > 0,
+            globalStep > 0, globalStep % config.targetSyncEvery == 0
+        else {
+            return
+        }
+        targetQNetwork.update(parameters: onlineQNetwork.parameters())
     }
 }
