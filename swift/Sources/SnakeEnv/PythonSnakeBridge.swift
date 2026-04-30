@@ -1,10 +1,73 @@
 import Foundation
 
 final class PythonSnakeBridge: SnakeBridgeClient, @unchecked Sendable {
+    private struct BaseResponse: Decodable {
+        let ok: Bool
+        let error: String?
+    }
+
+    private struct EmptyResponse: Decodable {}
+
+    private struct CreateEnvRequest: Encodable {
+        let cmd: String = "create_env"
+        let envName: String?
+
+        enum CodingKeys: String, CodingKey {
+            case cmd
+            case envName = "env_name"
+        }
+    }
+
+    private struct ResetRequest: Encodable {
+        let cmd: String = "reset"
+    }
+
+    private struct ResetResponse: Decodable {
+        let frame: [[UInt8]]
+    }
+
+    private struct StepRequest: Encodable {
+        let cmd: String = "step"
+        let action: Int
+    }
+
+    private struct StepResponse: Decodable {
+        let observation: [[UInt8]]
+        let reward: Float
+        let done: Bool
+        let score: Float
+    }
+
+    private struct ScoreRequest: Encodable {
+        let cmd: String = "score"
+    }
+
+    private struct ScoreResponse: Decodable {
+        let score: Float
+    }
+
+    private struct IsDoneRequest: Encodable {
+        let cmd: String = "is_done"
+    }
+
+    private struct IsDoneResponse: Decodable {
+        let done: Bool
+    }
+
+    private struct RenderRequest: Encodable {
+        let cmd: String = "render"
+    }
+
+    private struct QuitRequest: Encodable {
+        let cmd: String = "quit"
+    }
+
     private let process: Process
     private let stdinHandle: FileHandle
     private let stdoutHandle: FileHandle
     private let lock = NSLock()
+    private let encoder = JSONEncoder()
+    private let decoder = JSONDecoder()
 
     private init(process: Process, stdinHandle: FileHandle, stdoutHandle: FileHandle) {
         self.process = process
@@ -13,7 +76,7 @@ final class PythonSnakeBridge: SnakeBridgeClient, @unchecked Sendable {
     }
 
     deinit {
-        _ = try? sendRaw(["cmd": "quit"])
+        _ = try? sendRaw(QuitRequest(), as: EmptyResponse.self)
         if process.isRunning {
             process.terminate()
         }
@@ -55,10 +118,7 @@ final class PythonSnakeBridge: SnakeBridgeClient, @unchecked Sendable {
         )
 
         do {
-            let response = try bridge.sendRaw(["cmd": "create_env"])
-            guard response["ok"] as? Bool == true else {
-                return nil
-            }
+            _ = try bridge.send(CreateEnvRequest(envName: nil), as: EmptyResponse.self)
             return bridge
         } catch {
             return nil
@@ -66,41 +126,25 @@ final class PythonSnakeBridge: SnakeBridgeClient, @unchecked Sendable {
     }
 
     func reset() throws -> [[UInt8]] {
-        let response = try send(["cmd": "reset"])
-        guard let frame = response["frame"] as? [[NSNumber]] else {
-            throw SnakeEnvError.pythonConversionFailed("Missing frame in reset response")
-        }
-        return frame.map { row in row.map { UInt8(clamping: $0.intValue) } }
+        let response = try send(ResetRequest(), as: ResetResponse.self)
+        return response.frame
     }
 
     func step(action: Int) throws -> (observation: [[UInt8]], reward: Float, done: Bool, score: Float) {
-        let response = try send(["cmd": "step", "action": action])
-
-        guard let observation = response["observation"] as? [[NSNumber]] else {
-            throw SnakeEnvError.pythonConversionFailed("Missing observation in step response")
-        }
-        guard let reward = response["reward"] as? NSNumber else {
-            throw SnakeEnvError.pythonConversionFailed("Missing reward in step response")
-        }
-        guard let done = response["done"] as? Bool else {
-            throw SnakeEnvError.pythonConversionFailed("Missing done in step response")
-        }
-        guard let score = response["score"] as? NSNumber else {
-            throw SnakeEnvError.pythonConversionFailed("Missing score in step response")
-        }
+        let response = try send(StepRequest(action: action), as: StepResponse.self)
 
         return (
-            observation.map { row in row.map { UInt8(clamping: $0.intValue) } },
-            reward.floatValue,
-            done,
-            score.floatValue
+            response.observation,
+            response.reward,
+            response.done,
+            response.score
         )
     }
 
     func score() -> Float {
         do {
-            let response = try send(["cmd": "score"])
-            return (response["score"] as? NSNumber)?.floatValue ?? 0
+            let response = try send(ScoreRequest(), as: ScoreResponse.self)
+            return response.score
         } catch {
             return 0
         }
@@ -108,54 +152,58 @@ final class PythonSnakeBridge: SnakeBridgeClient, @unchecked Sendable {
 
     func isDone() -> Bool {
         do {
-            let response = try send(["cmd": "is_done"])
-            return (response["done"] as? Bool) ?? false
+            let response = try send(IsDoneRequest(), as: IsDoneResponse.self)
+            return response.done
         } catch {
             return false
         }
     }
 
     func render() throws {
-        _ = try send(["cmd": "render"])
+        _ = try send(RenderRequest(), as: EmptyResponse.self)
     }
 
-    private func send(_ payload: [String: Any]) throws -> [String: Any] {
-        let response = try sendRaw(payload)
-        if response["ok"] as? Bool == false {
-            let error = (response["error"] as? String) ?? "Python bridge error"
+    private func send<Request: Encodable, Response: Decodable>(_ payload: Request, as: Response.Type) throws
+        -> Response
+    {
+        let (base, body) = try sendRaw(payload, as: Response.self)
+        if !base.ok {
+            let error = base.error ?? "Python bridge error"
             throw SnakeEnvError.pythonBridgeInitializationFailed(error)
         }
-        return response
+        return body
     }
 
-    private func sendRaw(_ payload: [String: Any]) throws -> [String: Any] {
+    private func sendRaw<Request: Encodable, Response: Decodable>(_ payload: Request, as: Response.Type) throws
+        -> (BaseResponse, Response)
+    {
         lock.lock()
         defer { lock.unlock() }
 
-        let json = try JSONSerialization.data(withJSONObject: payload)
-        guard var line = String(data: json, encoding: .utf8) else {
-            throw SnakeEnvError.pythonConversionFailed("Unable to encode request JSON")
-        }
-        line += "\n"
+        let requestData = try encoder.encode(payload)
+        var lineData = requestData
+        lineData.append(0x0A)
 
-        guard let request = line.data(using: .utf8) else {
-            throw SnakeEnvError.pythonConversionFailed("Unable to build request bytes")
-        }
+        try stdinHandle.write(contentsOf: lineData)
+        let responseData = try readLineData()
 
-        try stdinHandle.write(contentsOf: request)
-        let responseLine = try readLine()
-
-        guard let responseData = responseLine.data(using: .utf8) else {
-            throw SnakeEnvError.pythonConversionFailed("Invalid response encoding")
-        }
-        let object = try JSONSerialization.jsonObject(with: responseData)
-        guard let dict = object as? [String: Any] else {
-            throw SnakeEnvError.pythonConversionFailed("Response is not a JSON object")
-        }
-        return dict
+        let base = try decodeResponse(BaseResponse.self, from: responseData)
+        let body = try decodeResponse(Response.self, from: responseData)
+        return (base, body)
     }
 
-    private func readLine() throws -> String {
+    private func decodeResponse<Response: Decodable>(_ type: Response.Type, from data: Data) throws -> Response {
+        do {
+            return try decoder.decode(type, from: data)
+        } catch {
+            let raw = String(data: data, encoding: .utf8) ?? "<non-utf8>"
+            throw SnakeEnvError.pythonConversionFailed(
+                "Unable to decode \(String(describing: type)) from response: \(raw)"
+            )
+        }
+    }
+
+    private func readLineData() throws -> Data {
         var buffer = Data()
         while true {
             guard let chunk = try stdoutHandle.read(upToCount: 1), !chunk.isEmpty else {
@@ -166,10 +214,7 @@ final class PythonSnakeBridge: SnakeBridgeClient, @unchecked Sendable {
             }
             buffer.append(chunk)
         }
-        guard let line = String(data: buffer, encoding: .utf8) else {
-            throw SnakeEnvError.pythonConversionFailed("Unable to decode response line")
-        }
-        return line
+        return buffer
     }
 
     private static func resolvePythonModulePath(explicitPath: String?) -> String {
