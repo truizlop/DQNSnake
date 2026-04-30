@@ -44,8 +44,9 @@ def main() -> int:
 
             if cmd == "create_env":
                 env_name = request.get("env_name", "Snake-v0")
+                seed = request.get("seed")
                 with contextlib.redirect_stdout(sys.stderr):
-                    env = SnakeEnvAdapter(env_name=env_name)
+                    env = SnakeEnvAdapter(env_name=env_name, seed=seed)
                 _ok()
                 continue
 

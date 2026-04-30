@@ -2,7 +2,7 @@ import Testing
 @testable import SnakeDQNTrain
 
 @Test func epsilonGreedyPolicyUsesGreedyActionWhenEpsilonIsZero() {
-    let policy = EpsilonGreedyPolicy(
+    var policy = EpsilonGreedyPolicy(
         epsilonStart: 0,
         epsilonEnd: 0,
         epsilonDecaySteps: 1

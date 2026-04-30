@@ -11,10 +11,12 @@ final class PythonSnakeBridge: SnakeBridgeClient, @unchecked Sendable {
     private struct CreateEnvRequest: Encodable {
         let cmd: String = "create_env"
         let envName: String?
+        let seed: Int?
 
         enum CodingKeys: String, CodingKey {
             case cmd
             case envName = "env_name"
+            case seed
         }
     }
 
@@ -82,7 +84,7 @@ final class PythonSnakeBridge: SnakeBridgeClient, @unchecked Sendable {
         }
     }
 
-    static func make(pythonModulePath: String?) -> PythonSnakeBridge? {
+    static func make(pythonModulePath: String?, seed: Int?) -> PythonSnakeBridge? {
         let executable = pythonExecutable()
         let modulePath = resolvePythonModulePath(explicitPath: pythonModulePath)
         let serverScript = (modulePath as NSString).appendingPathComponent("bridge_server.py")
@@ -118,7 +120,7 @@ final class PythonSnakeBridge: SnakeBridgeClient, @unchecked Sendable {
         )
 
         do {
-            _ = try bridge.send(CreateEnvRequest(envName: nil), as: EmptyResponse.self)
+            _ = try bridge.send(CreateEnvRequest(envName: nil, seed: seed), as: EmptyResponse.self)
             return bridge
         } catch {
             return nil

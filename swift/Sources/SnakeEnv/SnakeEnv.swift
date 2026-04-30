@@ -11,8 +11,9 @@ protocol SnakeBridgeClient: Sendable {
 public actor SnakeEnv {
     private let bridge: SnakeBridgeClient
 
-    public init(usePythonBridge: Bool = true, pythonModulePath: String? = nil) {
-        if usePythonBridge, let pythonBridge = PythonSnakeBridge.make(pythonModulePath: pythonModulePath) {
+    public init(usePythonBridge: Bool = true, pythonModulePath: String? = nil, seed: Int? = nil) {
+        if usePythonBridge, let pythonBridge = PythonSnakeBridge.make(pythonModulePath: pythonModulePath, seed: seed)
+        {
             self.bridge = pythonBridge
         } else {
             self.bridge = UnavailableSnakeBridge()

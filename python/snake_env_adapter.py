@@ -36,6 +36,7 @@ class SnakeEnvAdapter:
         grid_size: int = 84,
         tile_size: int | None = None,
         initial_length: int = 4,
+        seed: int | None = None,
         normalize_rewards: bool = True,
         binary_observation: bool = True,
     ):
@@ -55,14 +56,18 @@ class SnakeEnvAdapter:
             env_kwargs={"dim": self.grid_size, "size": self.tile_size},
         )
         self.initial_length = max(1, int(initial_length))
+        self.seed = int(seed) if seed is not None else None
         self.normalize_rewards = bool(normalize_rewards)
         self.binary_observation = bool(binary_observation)
         self.obs: np.ndarray | None = None
         self.done = False
         self.score = 0.0
+        self._reset_count = 0
+        self._seed_env_rngs()
 
     def reset(self) -> np.ndarray:
-        raw = self.env.reset()
+        reset_seed = self._next_reset_seed()
+        raw = self._reset_with_seed(reset_seed)
         self.obs = self._extract_obs_from_reset(raw)
         self._enforce_initial_length()
         self.done = False
@@ -160,6 +165,33 @@ class SnakeEnvAdapter:
                 f"Snake environment `{env_name}` is unavailable. "
                 f"Registered snake envs: {available or 'none'}."
             )
+
+    def _seed_env_rngs(self) -> None:
+        if self.seed is None:
+            return
+        random.seed(self.seed)
+        np.random.seed(self.seed)
+        if hasattr(self.env, "action_space") and hasattr(self.env.action_space, "seed"):
+            self.env.action_space.seed(self.seed)
+        if hasattr(self.env, "observation_space") and hasattr(self.env.observation_space, "seed"):
+            self.env.observation_space.seed(self.seed)
+
+    def _next_reset_seed(self) -> int | None:
+        if self.seed is None:
+            return None
+        seed = self.seed + self._reset_count
+        self._reset_count += 1
+        return seed
+
+    def _reset_with_seed(self, seed: int | None) -> Any:
+        if seed is None:
+            return self.env.reset()
+        try:
+            return self.env.reset(seed=seed)
+        except TypeError:
+            if hasattr(self.env, "seed"):
+                self.env.seed(seed)
+            return self.env.reset()
 
     def _enforce_initial_length(self) -> None:
         if self.initial_length <= 1:

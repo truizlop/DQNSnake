@@ -14,12 +14,12 @@ _lock = Lock()
 _last_error: Optional[str] = None
 
 
-def create_env(env_name: str = "Snake-v0") -> int:
+def create_env(env_name: str = "Snake-v0", seed: int | None = None) -> int:
     global _env
     global _last_error
     with _lock:
         try:
-            _env = SnakeEnvAdapter(env_name=env_name)
+            _env = SnakeEnvAdapter(env_name=env_name, seed=seed)
             _last_error = None
             return 1
         except Exception as exc:  # pragma: no cover - runtime dependent

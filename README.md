@@ -75,6 +75,7 @@ Useful env vars:
 - `SNAKE_PYTHON_EXE` (Python binary for Swift bridge; defaults to `/opt/anaconda3/bin/python3` when available)
 - `SNAKE_PYTHON_DIR` (Python module directory; defaults to `python/`)
 - `SNAKE_RESUME_CHECKPOINT` (path to `.safetensors` checkpoint to resume from)
+- `SNAKE_SEED` (optional int; enables deterministic replay sampling, epsilon exploration RNG, and seeded Python env resets)
 
 Evaluation env vars:
 - `SNAKE_EVAL_EVERY_EPISODES` (default `0`, disabled)
@@ -125,6 +126,7 @@ Logged scalar groups:
 - `eval/avg_score`
 
 Structured log event stream (`SNAKE_OBS_LOG_PATH`) includes:
+- `run_start`
 - `resume`
 - `episode_end`
 - `optimize_step`
@@ -165,3 +167,10 @@ Structured log event stream (`SNAKE_OBS_LOG_PATH`) includes:
 - Reversing direction into the snake body causes immediate terminal state (confirmed behavior).
 - MLX runtime requirements (Metal / bundled libs) still apply depending on your local setup.
 - Optimizer state checkpoint/resume is not yet implemented (model weights resume is implemented).
+
+## Reproducibility
+
+Set `SNAKE_SEED` to a fixed integer to improve run-to-run reproducibility. When set:
+- Swift replay buffer sampling uses a deterministic PRNG.
+- Swift epsilon-greedy exploration sampling uses a deterministic PRNG.
+- Python env is seeded, and each `reset()` uses `seed + reset_count` for deterministic episode progression.

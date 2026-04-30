@@ -7,7 +7,7 @@ struct DQNTrainer {
     var config: DQNTrainingConfig
     var replayBuffer: ReplayBuffer
     let learner: DQNLearner
-    let explorationPolicy: EpsilonGreedyPolicy
+    var explorationPolicy: EpsilonGreedyPolicy
     let episodeRunner: DQNEpisodeRunner
     let evaluator: DQNEvaluator
     var checkpointManager: DQNCheckpointManager
@@ -20,13 +20,15 @@ struct DQNTrainer {
         self.config = config
         self.replayBuffer = ReplayBuffer(
             capacity: config.replayBufferCapacity,
-            samplingStrategy: config.replaySamplingStrategy
+            samplingStrategy: config.replaySamplingStrategy,
+            seed: config.seed
         )
         self.learner = DQNLearner(gamma: config.gamma, learningRate: config.learningRate)
         self.explorationPolicy = EpsilonGreedyPolicy(
             epsilonStart: config.epsilonStart,
             epsilonEnd: config.epsilonEnd,
-            epsilonDecaySteps: config.epsilonDecaySteps
+            epsilonDecaySteps: config.epsilonDecaySteps,
+            seed: config.seed.map { $0 &+ 1 }
         )
         self.episodeRunner = DQNEpisodeRunner(
             env: env,
@@ -67,6 +69,16 @@ struct DQNTrainer {
             try logger.start()
             self.structuredLogger = logger
         }
+        structuredLogger?.log(
+            event: "run_start",
+            step: 0,
+            fields: [
+                "seed": config.seed.map(String.init) ?? "none",
+                "replay_sampling_strategy": "\(config.replaySamplingStrategy)",
+                "train_every": "\(config.trainEvery)",
+                "batch_size": "\(config.batchSize)",
+            ]
+        )
 
         var globalStep = try maybeResumeFromCheckpoint()
         var episode = 0
@@ -196,6 +208,13 @@ struct DQNTrainer {
             && episode % config.evalEveryEpisodes == 0
     }
 
+    private mutating func selectAction(state: MLXArray, globalStep: Int) -> SnakeAction {
+        explorationPolicy.selectAction(
+            globalStep: globalStep,
+            greedyAction: learner.greedyAction(for: state)
+        )
+    }
+
     private mutating func applyTrainingSchedule(globalStep: Int) throws {
         if shouldOptimize(globalStep: globalStep) {
             optimizeFromReplay(globalStep: globalStep)
@@ -216,13 +235,6 @@ struct DQNTrainer {
                 fields: ["checkpoint_every_steps": "\(config.checkpointEverySteps)"]
             )
         }
-    }
-
-    private func selectAction(state: MLXArray, globalStep: Int) -> SnakeAction {
-        explorationPolicy.selectAction(
-            globalStep: globalStep,
-            greedyAction: learner.greedyAction(for: state)
-        )
     }
 
     private mutating func optimizeFromReplay(globalStep: Int) {
