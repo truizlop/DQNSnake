@@ -10,9 +10,11 @@ struct DQNEpisodeRunner {
         globalStep: inout Int,
         totalEnvironmentSteps: Int,
         selectAction: (MLXArray, Int) -> SnakeAction,
-        onTransition: (DQNTransition, Int) -> Void
-    ) async throws -> Int {
+        onTransition: (DQNTransition, Int) throws -> Void
+    ) async throws -> DQNEpisodeResult {
         var stepsInEpisode = 0
+        var totalReward: Float = 0
+        var finalScore: Float = 0
 
         let initial = try await env.reset()
         var frameStack = FrameStack(capacity: 4)
@@ -37,8 +39,10 @@ struct DQNEpisodeRunner {
                 nextState: nextState,
                 done: stepResult.done
             )
-            onTransition(transition, globalStep)
+            try onTransition(transition, globalStep)
 
+            totalReward += stepResult.reward
+            finalScore = stepResult.score
             state = nextState
             globalStep += 1
             stepsInEpisode += 1
@@ -48,7 +52,11 @@ struct DQNEpisodeRunner {
             }
         }
 
-        return stepsInEpisode
+        return DQNEpisodeResult(
+            steps: stepsInEpisode,
+            totalReward: totalReward,
+            finalScore: finalScore
+        )
     }
 
     private func stateTensor(from stackedFrames: [UInt8], width: Int, height: Int) -> MLXArray {

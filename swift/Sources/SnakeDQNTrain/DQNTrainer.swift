@@ -9,6 +9,7 @@ struct DQNTrainer {
     let learner: DQNLearner
     let explorationPolicy: EpsilonGreedyPolicy
     let episodeRunner: DQNEpisodeRunner
+    var checkpointManager: DQNCheckpointManager
 
     init(env: SnakeEnv, config: DQNTrainingConfig = DQNTrainingConfig()) {
         self.env = env
@@ -27,6 +28,11 @@ struct DQNTrainer {
             env: env,
             maxStepsPerEpisode: config.maxStepsPerEpisode
         )
+        self.checkpointManager = DQNCheckpointManager(
+            checkpointDirectory: config.checkpointDirectory,
+            checkpointEverySteps: config.checkpointEverySteps,
+            saveBestCheckpoint: config.saveBestCheckpoint
+        )
     }
 
     mutating func run() async throws {
@@ -35,7 +41,7 @@ struct DQNTrainer {
 
         while globalStep < config.totalEnvironmentSteps {
             episode += 1
-            let stepsInEpisode = try await episodeRunner.runEpisode(
+            let episodeResult = try await episodeRunner.runEpisode(
                 globalStep: &globalStep,
                 totalEnvironmentSteps: config.totalEnvironmentSteps,
                 selectAction: { state, step in
@@ -43,11 +49,20 @@ struct DQNTrainer {
                 },
                 onTransition: { transition, step in
                     self.replayBuffer.append(transition)
-                    self.applyTrainingSchedule(globalStep: step)
+                    try self.applyTrainingSchedule(globalStep: step)
                 }
             )
 
-            print("episode=\(episode) steps=\(stepsInEpisode) globalStep=\(globalStep)")
+            try checkpointManager.maybeSaveBestCheckpoint(
+                learner: learner,
+                episodeResult: episodeResult,
+                episode: episode,
+                globalStep: globalStep
+            )
+
+            print(
+                "episode=\(episode) steps=\(episodeResult.steps) reward=\(episodeResult.totalReward) score=\(episodeResult.finalScore) globalStep=\(globalStep)"
+            )
         }
     }
 
@@ -63,13 +78,14 @@ struct DQNTrainer {
             && globalStep % config.targetSyncEvery == 0
     }
 
-    private mutating func applyTrainingSchedule(globalStep: Int) {
+    private mutating func applyTrainingSchedule(globalStep: Int) throws {
         if shouldOptimize(globalStep: globalStep) {
             optimizeFromReplay()
         }
         if shouldSyncTarget(globalStep: globalStep) {
             learner.syncTargetFromOnline()
         }
+        try checkpointManager.maybeSaveStepCheckpoint(learner: learner, globalStep: globalStep)
     }
 
     private func selectAction(state: MLXArray, globalStep: Int) -> SnakeAction {
