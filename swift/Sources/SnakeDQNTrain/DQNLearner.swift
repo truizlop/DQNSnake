@@ -13,14 +13,9 @@ final class DQNLearner {
     private let gamma: Float
     private let lossAndGrad: (DQNModel, [MLXArray]) -> ([MLXArray], ModuleParameters)
 
-    init(
-        onlineQNetwork: DQNModel,
-        targetQNetwork: DQNModel,
-        gamma: Float,
-        learningRate: Float
-    ) {
-        self.onlineQNetwork = onlineQNetwork
-        self.targetQNetwork = targetQNetwork
+    init(gamma: Float, learningRate: Float) {
+        self.onlineQNetwork = DQNModel()
+        self.targetQNetwork = DQNModel()
         self.gamma = gamma
         self.optimizer = Adam(learningRate: learningRate)
         self.lossAndGrad = valueAndGrad(model: onlineQNetwork) { [targetQNetwork] model, arrays in
@@ -55,6 +50,16 @@ final class DQNLearner {
 
             return [mseLoss(predictions: predictedQ, targets: targetQ, reduction: .mean)]
         }
+    }
+
+    func greedyAction(for state: MLXArray) -> SnakeAction {
+        let qValues = onlineQNetwork(state)
+        let greedyActionIndex = qValues.argMax().item(Int.self)
+        return SnakeAction(rawValue: greedyActionIndex) ?? .up
+    }
+
+    func syncTargetFromOnline() {
+        targetQNetwork.update(parameters: onlineQNetwork.parameters())
     }
 
     @discardableResult

@@ -1,12 +1,9 @@
 import Foundation
 import MLX
-import MLXNN
 import SnakeEnv
 
 struct DQNTrainer {
     let env: SnakeEnv
-    let onlineQNetwork: DQNModel
-    let targetQNetwork: DQNModel
     var config: DQNTrainingConfig
     var replayBuffer: ReplayBuffer
     let learner: DQNLearner
@@ -14,15 +11,8 @@ struct DQNTrainer {
     init(env: SnakeEnv, config: DQNTrainingConfig = DQNTrainingConfig()) {
         self.env = env
         self.config = config
-        self.onlineQNetwork = DQNModel()
-        self.targetQNetwork = DQNModel()
         self.replayBuffer = ReplayBuffer(capacity: config.replayBufferCapacity)
-        self.learner = DQNLearner(
-            onlineQNetwork: self.onlineQNetwork,
-            targetQNetwork: self.targetQNetwork,
-            gamma: config.gamma,
-            learningRate: config.learningRate
-        )
+        self.learner = DQNLearner(gamma: config.gamma, learningRate: config.learningRate)
     }
 
     mutating func run() async throws {
@@ -90,9 +80,7 @@ struct DQNTrainer {
             return SnakeAction.allCases.randomElement()!
         }
 
-        let qValues = onlineQNetwork(state)
-        let greedyActionIndex = qValues.argMax().item(Int.self)
-        return SnakeAction(rawValue: greedyActionIndex) ?? .up
+        return learner.greedyAction(for: state)
     }
 
     private func epsilonValue(globalStep: Int) -> Float {
@@ -126,6 +114,6 @@ struct DQNTrainer {
         else {
             return
         }
-        targetQNetwork.update(parameters: onlineQNetwork.parameters())
+        learner.syncTargetFromOnline()
     }
 }
