@@ -48,7 +48,7 @@ Single-player Snake training stack with:
   - `3` = apple
 - Rewards are normalized to:
   - `+1` apple
-  - `SNAKE_ALIVE_REWARD` normal step (default `0`)
+  - `SNAKE_ALIVE_REWARD` normal step (default `0.0005`)
   - `-1` terminal collision
 - `score` returned by env is cumulative reward.
 
@@ -76,10 +76,12 @@ Useful env vars:
 - `SNAKE_MAX_EPISODE_STEPS` (Swift DQN trainer)
 - `SNAKE_PYTHON_EXE` (Python binary for Swift bridge; defaults to `/opt/anaconda3/bin/python3` when available)
 - `SNAKE_PYTHON_DIR` (Python module directory; defaults to `python/`)
+- `SNAKE_ENV_DIM` (default `20`; actual snake board size used by `gym-snake`)
+- `SNAKE_GRID_SIZE` (default `84`; observation size sent to Swift/model after nearest-neighbor resize)
 - `SNAKE_MLX_DEVICE` (`cpu` or `gpu`, default `cpu` for CLI stability)
 - `SNAKE_RESUME_CHECKPOINT` (path to `.safetensors` checkpoint to resume from)
 - `SNAKE_SEED` (optional int; enables deterministic replay sampling, epsilon exploration RNG, and seeded Python env resets)
-- `SNAKE_ALIVE_REWARD` (default `0`; optional small per-step reward for non-terminal, non-apple steps in normalized reward mode)
+- `SNAKE_ALIVE_REWARD` (default `0.0005`; optional per-step reward for non-terminal, non-apple steps in normalized reward mode)
 
 Evaluation env vars:
 - `SNAKE_EVAL_EVERY_EPISODES` (default `0`, disabled)
@@ -185,6 +187,7 @@ Structured log event stream (`SNAKE_OBS_LOG_PATH`) includes:
 ## Current caveats / notes
 
 - `gym-snake` upstream uses old Gym APIs and emits deprecation warnings.
+- Training uses a smaller env board (`SNAKE_ENV_DIM`) and resizes observations to `SNAKE_GRID_SIZE`; this keeps apple density practical while preserving the model input shape.
 - Reversing direction into the snake body causes immediate terminal state (confirmed behavior).
 - MLX runtime requirements (Metal / bundled libs) still apply depending on your local setup.
 - Optimizer state checkpoint/resume is not yet implemented (model weights resume is implemented).

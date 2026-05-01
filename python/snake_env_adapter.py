@@ -34,12 +34,13 @@ class SnakeEnvAdapter:
         self,
         env_name: str = "Snake-v0",
         grid_size: int = 84,
+        snake_dim: int = 20,
         tile_size: int | None = None,
         initial_length: int = 4,
         seed: int | None = None,
         normalize_rewards: bool = True,
         binary_observation: bool = True,
-        alive_reward: float = 0.0,
+        alive_reward: float = 0.0005,
     ):
         if gym is None:
             raise RuntimeError(
@@ -47,14 +48,15 @@ class SnakeEnvAdapter:
             )
         self._ensure_snake_registered()
         self.grid_size = max(4, int(grid_size))
+        self.snake_dim = max(4, int(snake_dim))
         if tile_size is None:
             # Keep rendered windows usable for larger grids.
-            tile_size = max(4, 640 // self.grid_size)
+            tile_size = max(4, 640 // self.snake_dim)
         self.tile_size = max(1, int(tile_size))
 
         self.env = self._make_env(
             env_name,
-            env_kwargs={"dim": self.grid_size, "size": self.tile_size},
+            env_kwargs={"dim": self.snake_dim, "size": self.tile_size},
         )
         self.initial_length = max(1, int(initial_length))
         self.seed = int(seed) if seed is not None else None
@@ -77,7 +79,8 @@ class SnakeEnvAdapter:
         return self._obs_to_grid(self.obs)
 
     def step(self, action: int) -> tuple[np.ndarray, float, bool, float]:
-        raw = self.env.step(action)
+        safe_action = self._sanitize_action(action)
+        raw = self.env.step(safe_action)
         obs, raw_reward, done = self._extract_step_fields(raw)
         reward = self._transform_reward(raw_reward, done)
 
@@ -92,6 +95,36 @@ class SnakeEnvAdapter:
             score=float(self.score),
         )
         return output.observation, output.reward, output.done, output.score
+
+    def _sanitize_action(self, action: int) -> int:
+        unwrapped = getattr(self.env, "unwrapped", None)
+        if unwrapped is None or not hasattr(unwrapped, "snake"):
+            return int(action)
+        return int(self._sanitize_action_for_snake(int(action), list(unwrapped.snake)))
+
+    @staticmethod
+    def _sanitize_action_for_snake(action: int, snake: list[list[int]]) -> int:
+        # Actions in gym-snake: 0=left, 1=up, 2=right, 3=down.
+        # If snake has a neck segment, forbid instant 180-degree turn into it.
+        if len(snake) < 2:
+            return action
+        head_x, head_y = snake[0]
+        neck_x, neck_y = snake[1]
+
+        if head_x == neck_x:
+            moving_right = head_y > neck_y
+            if moving_right and action == 0:
+                return 2
+            if (not moving_right) and action == 2:
+                return 0
+            return action
+
+        moving_down = head_x > neck_x
+        if moving_down and action == 1:
+            return 3
+        if (not moving_down) and action == 3:
+            return 1
+        return action
 
     def get_frame(self) -> np.ndarray:
         if self.obs is None:
@@ -250,12 +283,21 @@ class SnakeEnvAdapter:
                     if 0 <= ax < dim and 0 <= ay < dim:
                         # 3=apple
                         grid[ax, ay] = 3
-                return grid
+                return self._resize_grid_if_needed(grid)
 
         arr = self._process_obs(obs)
         if self.binary_observation:
-            return (arr > 0).astype(np.uint8)
-        return arr
+            arr = (arr > 0).astype(np.uint8)
+        return self._resize_grid_if_needed(arr)
+
+    def _resize_grid_if_needed(self, grid: np.ndarray) -> np.ndarray:
+        if grid.ndim != 2 or grid.shape == (self.grid_size, self.grid_size):
+            return grid
+        src_h, src_w = grid.shape
+        dst = self.grid_size
+        row_idx = (np.arange(dst) * src_h / dst).astype(np.int64)
+        col_idx = (np.arange(dst) * src_w / dst).astype(np.int64)
+        return grid[row_idx][:, col_idx]
 
 
 class FrameStack:

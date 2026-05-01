@@ -87,3 +87,25 @@ def test_transform_reward_applies_alive_reward_for_non_terminal_step() -> None:
     assert adapter._transform_reward(raw_reward=0.0, done=False) == pytest.approx(0.001)
     assert adapter._transform_reward(raw_reward=100.0, done=False) == pytest.approx(1.0)
     assert adapter._transform_reward(raw_reward=0.0, done=True) == pytest.approx(-1.0)
+
+
+def test_resize_grid_if_needed_maps_to_target_shape() -> None:
+    adapter = object.__new__(SnakeEnvAdapter)
+    adapter.grid_size = 84
+    small = np.zeros((20, 20), dtype=np.uint8)
+    small[3, 4] = 2
+    out = adapter._resize_grid_if_needed(small)
+    assert out.shape == (84, 84)
+    assert (out == 2).any()
+
+
+def test_sanitize_action_for_snake_blocks_reverse_turn() -> None:
+    # Moving right (head at larger y than neck), reverse-left should become right.
+    snake_right = [[5, 6], [5, 5], [5, 4]]
+    assert SnakeEnvAdapter._sanitize_action_for_snake(0, snake_right) == 2
+    assert SnakeEnvAdapter._sanitize_action_for_snake(1, snake_right) == 1
+
+    # Moving up (head at smaller x than neck), reverse-down should become up.
+    snake_up = [[4, 5], [5, 5], [6, 5]]
+    assert SnakeEnvAdapter._sanitize_action_for_snake(3, snake_up) == 1
+    assert SnakeEnvAdapter._sanitize_action_for_snake(0, snake_up) == 0

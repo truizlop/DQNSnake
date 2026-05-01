@@ -56,9 +56,17 @@ def main() -> int:
             if cmd == "create_env":
                 env_name = request.get("env_name", "Snake-v0")
                 seed = request.get("seed")
-                alive_reward = request.get("alive_reward", _env_float("SNAKE_ALIVE_REWARD", 0.0))
+                alive_reward = request.get("alive_reward", _env_float("SNAKE_ALIVE_REWARD", 0.0005))
+                snake_dim = int(request.get("snake_dim", os.getenv("SNAKE_ENV_DIM", "20")))
+                grid_size = int(request.get("grid_size", os.getenv("SNAKE_GRID_SIZE", "84")))
                 with contextlib.redirect_stdout(sys.stderr):
-                    env = SnakeEnvAdapter(env_name=env_name, seed=seed, alive_reward=alive_reward)
+                    env = SnakeEnvAdapter(
+                        env_name=env_name,
+                        seed=seed,
+                        alive_reward=alive_reward,
+                        snake_dim=snake_dim,
+                        grid_size=grid_size,
+                    )
                 _ok()
                 continue
 

@@ -163,3 +163,20 @@ def test_bridge_server_rejects_invalid_alive_reward_env_var() -> None:
     finally:
         server.kill()
         server.wait(timeout=5)
+
+
+def test_bridge_server_supports_configured_env_dim_and_grid_size() -> None:
+    server = _start_bridge_server_with_env({"SNAKE_ENV_DIM": "20", "SNAKE_GRID_SIZE": "84"})
+    try:
+        assert _send(server, {"cmd": "create_env", "seed": 7})["ok"] is True
+        reset = _send(server, {"cmd": "reset"})
+        assert reset["ok"] is True
+        frame = np.array(reset["frame"], dtype=np.uint8)
+        assert frame.shape == (84, 84)
+    finally:
+        try:
+            _send(server, {"cmd": "quit"})
+        except Exception:
+            pass
+        server.kill()
+        server.wait(timeout=5)
