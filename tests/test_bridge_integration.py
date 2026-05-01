@@ -100,3 +100,41 @@ def test_bridge_server_step_changes_observation_for_valid_motion() -> None:
             pass
         server.kill()
         server.wait(timeout=5)
+
+
+def test_bridge_server_returns_error_for_unknown_command() -> None:
+    server = _start_bridge_server()
+    try:
+        resp = _send(server, {"cmd": "does_not_exist"})
+        assert resp["ok"] is False
+        assert "Unknown command" in resp["error"]
+    finally:
+        server.kill()
+        server.wait(timeout=5)
+
+
+def test_bridge_server_requires_create_env_before_step() -> None:
+    server = _start_bridge_server()
+    try:
+        resp = _send(server, {"cmd": "step", "action": 0})
+        assert resp["ok"] is False
+        assert "Environment not created" in resp["error"]
+    finally:
+        server.kill()
+        server.wait(timeout=5)
+
+
+def test_bridge_server_rejects_non_integer_action_payload() -> None:
+    server = _start_bridge_server()
+    try:
+        assert _send(server, {"cmd": "create_env", "seed": 99})["ok"] is True
+        resp = _send(server, {"cmd": "step", "action": "bad"})
+        assert resp["ok"] is False
+        assert "invalid literal" in resp["error"]
+    finally:
+        try:
+            _send(server, {"cmd": "quit"})
+        except Exception:
+            pass
+        server.kill()
+        server.wait(timeout=5)
