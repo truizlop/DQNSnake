@@ -66,6 +66,7 @@ From repo root:
 - `make run-swift-visual`: Swift-controlled rollout + pygame rendering
 - `make run-dqn`: run Swift DQN trainer target
   - auto-builds `default.metallib` if missing (`make prepare-mlx-metallib`)
+- `make open-xcode`: open `swift/Package.swift` in Xcode with a sanitized Apple toolchain PATH
 
 Useful env vars:
 
@@ -90,6 +91,7 @@ Training schedule override env vars:
 - `SNAKE_BATCH_SIZE`
 - `SNAKE_CHECKPOINT_EVERY_STEPS`
 - `SNAKE_CHECKPOINT_DIR`
+- `SNAKE_RESOURCE_TELEMETRY_EVERY_STEPS` (default `100`, `0` disables in-process resource telemetry)
 
 TensorBoard env vars:
 - `SNAKE_TB_ENABLE` (`1` default)
@@ -134,6 +136,10 @@ Logged scalar groups:
 - `train/optimize_duration_s`
 - `train/consecutive_skipped_updates`
 - `train/stability_guard_triggered`
+- `runtime/rss_mb`
+- `runtime/vmem_mb`
+- `runtime/cpu_user_s`
+- `runtime/cpu_system_s`
 - `eval/avg_reward`
 - `eval/avg_score`
 
@@ -147,6 +153,7 @@ Structured log event stream (`SNAKE_OBS_LOG_PATH`) includes:
 - `checkpoint_periodic_saved`
 - `checkpoint_best_saved`
 - `stability_guard_triggered`
+- `resource_telemetry`
 
 ## Swift API
 
@@ -180,6 +187,22 @@ Structured log event stream (`SNAKE_OBS_LOG_PATH`) includes:
 - Reversing direction into the snake body causes immediate terminal state (confirmed behavior).
 - MLX runtime requirements (Metal / bundled libs) still apply depending on your local setup.
 - Optimizer state checkpoint/resume is not yet implemented (model weights resume is implemented).
+
+## Toolchain / Linker troubleshooting
+
+If you see linker/toolchain failures in Swift/Xcode (for example, unexpected linker flags not recognized by `ld`), your shell PATH may be resolving a non-Apple linker first (commonly Conda's `/opt/anaconda3/bin/ld`).
+
+This repo includes `scripts/with_apple_toolchain.sh`, and Make targets already use it for Swift commands.
+
+Recommended usage:
+- `make test-swift`
+- `make run-dqn`
+- `make open-xcode` (launch Xcode from a sanitized environment)
+
+Quick check:
+- `./scripts/with_apple_toolchain.sh /bin/sh -lc 'which ld; xcrun -f ld'`
+
+Both paths should point to Apple's linker locations under `/usr/bin` or Xcode's default toolchain.
 
 ## Reproducibility
 
