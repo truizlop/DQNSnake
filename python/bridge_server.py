@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import contextlib
+import os
 import sys
 from typing import Any
 
@@ -11,6 +12,16 @@ from snake_env_adapter import SnakeEnvAdapter
 
 
 env: SnakeEnvAdapter | None = None
+
+
+def _env_float(name: str, default: float) -> float:
+    raw = os.getenv(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        return float(raw)
+    except ValueError as exc:
+        raise RuntimeError(f"Invalid float for {name}: {raw}") from exc
 
 
 def _ok(**payload: Any) -> None:
@@ -45,8 +56,9 @@ def main() -> int:
             if cmd == "create_env":
                 env_name = request.get("env_name", "Snake-v0")
                 seed = request.get("seed")
+                alive_reward = request.get("alive_reward", _env_float("SNAKE_ALIVE_REWARD", 0.0))
                 with contextlib.redirect_stdout(sys.stderr):
-                    env = SnakeEnvAdapter(env_name=env_name, seed=seed)
+                    env = SnakeEnvAdapter(env_name=env_name, seed=seed, alive_reward=alive_reward)
                 _ok()
                 continue
 

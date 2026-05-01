@@ -39,6 +39,7 @@ class SnakeEnvAdapter:
         seed: int | None = None,
         normalize_rewards: bool = True,
         binary_observation: bool = True,
+        alive_reward: float = 0.0,
     ):
         if gym is None:
             raise RuntimeError(
@@ -59,6 +60,7 @@ class SnakeEnvAdapter:
         self.seed = int(seed) if seed is not None else None
         self.normalize_rewards = bool(normalize_rewards)
         self.binary_observation = bool(binary_observation)
+        self.alive_reward = float(alive_reward)
         self.obs: np.ndarray | None = None
         self.done = False
         self.score = 0.0
@@ -226,7 +228,7 @@ class SnakeEnvAdapter:
             return 1.0
         if done:
             return -1.0
-        return 0.0
+        return self.alive_reward
 
     def _obs_to_grid(self, obs: Any) -> np.ndarray:
         # gym-snake v0.1.7 returns a 4-value tuple (head_x, head_y, apple_x, apple_y).

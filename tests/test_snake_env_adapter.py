@@ -77,3 +77,13 @@ def test_frame_stack_shape() -> None:
 
     assert stacked2.shape == (4, *obs.shape)
     assert np.array_equal(stacked2[-1], obs2)
+
+
+def test_transform_reward_applies_alive_reward_for_non_terminal_step() -> None:
+    adapter = object.__new__(SnakeEnvAdapter)
+    adapter.normalize_rewards = True
+    adapter.alive_reward = 0.001
+
+    assert adapter._transform_reward(raw_reward=0.0, done=False) == pytest.approx(0.001)
+    assert adapter._transform_reward(raw_reward=100.0, done=False) == pytest.approx(1.0)
+    assert adapter._transform_reward(raw_reward=0.0, done=True) == pytest.approx(-1.0)

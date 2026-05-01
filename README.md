@@ -48,7 +48,7 @@ Single-player Snake training stack with:
   - `3` = apple
 - Rewards are normalized to:
   - `+1` apple
-  - `0` normal step
+  - `SNAKE_ALIVE_REWARD` normal step (default `0`)
   - `-1` terminal collision
 - `score` returned by env is cumulative reward.
 
@@ -79,6 +79,7 @@ Useful env vars:
 - `SNAKE_MLX_DEVICE` (`cpu` or `gpu`, default `cpu` for CLI stability)
 - `SNAKE_RESUME_CHECKPOINT` (path to `.safetensors` checkpoint to resume from)
 - `SNAKE_SEED` (optional int; enables deterministic replay sampling, epsilon exploration RNG, and seeded Python env resets)
+- `SNAKE_ALIVE_REWARD` (default `0`; optional small per-step reward for non-terminal, non-apple steps in normalized reward mode)
 
 Evaluation env vars:
 - `SNAKE_EVAL_EVERY_EPISODES` (default `0`, disabled)

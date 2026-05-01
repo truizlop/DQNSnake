@@ -30,6 +30,20 @@ def _start_bridge_server() -> subprocess.Popen[str]:
         env=env,
     )
 
+def _start_bridge_server_with_env(extra_env: dict[str, str]) -> subprocess.Popen[str]:
+    env = os.environ.copy()
+    env["PYTHONUNBUFFERED"] = "1"
+    env["PYTHONPATH"] = str(PYTHON_DIR)
+    env.update(extra_env)
+    return subprocess.Popen(
+        [sys.executable, str(PYTHON_DIR / "bridge_server.py")],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=env,
+    )
+
 
 def _send(server: subprocess.Popen[str], payload: dict) -> dict:
     assert server.stdin is not None
@@ -136,5 +150,16 @@ def test_bridge_server_rejects_non_integer_action_payload() -> None:
             _send(server, {"cmd": "quit"})
         except Exception:
             pass
+        server.kill()
+        server.wait(timeout=5)
+
+
+def test_bridge_server_rejects_invalid_alive_reward_env_var() -> None:
+    server = _start_bridge_server_with_env({"SNAKE_ALIVE_REWARD": "not-a-float"})
+    try:
+        resp = _send(server, {"cmd": "create_env", "seed": 99})
+        assert resp["ok"] is False
+        assert "SNAKE_ALIVE_REWARD" in resp["error"]
+    finally:
         server.kill()
         server.wait(timeout=5)
