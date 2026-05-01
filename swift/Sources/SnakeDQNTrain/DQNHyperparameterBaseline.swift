@@ -19,6 +19,7 @@ enum DQNHyperparameterBaseline {
         tensorBoardPort: 6006,
         enableStructuredLogs: true,
         structuredLogPath: "runs/snake_dqn/observability.jsonl",
+        resourceTelemetryEverySteps: 100,
         seed: nil,
         warmupSteps: 5_000,
         trainEvery: 4,

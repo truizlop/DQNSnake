@@ -101,6 +101,7 @@ struct DQNTrainer {
                 onTransition: { transition, step in
                     self.replayBuffer.append(transition)
                     try self.applyTrainingSchedule(globalStep: step)
+                    self.maybeEmitResourceTelemetry(globalStep: step)
                 }
             )
 
@@ -280,6 +281,39 @@ struct DQNTrainer {
                 ]
             )
         }
+    }
+
+    private func maybeEmitResourceTelemetry(globalStep: Int) {
+        guard config.resourceTelemetryEverySteps > 0 else {
+            return
+        }
+        guard globalStep > 0, globalStep % config.resourceTelemetryEverySteps == 0 else {
+            return
+        }
+        guard let telemetry = DQNProcessTelemetry.capture() else {
+            return
+        }
+
+        tensorBoardPublisher?.publish(
+            step: globalStep,
+            scalars: [
+                "runtime/rss_mb": Float(telemetry.rssBytes) / 1_048_576,
+                "runtime/vmem_mb": Float(telemetry.virtualBytes) / 1_048_576,
+                "runtime/cpu_user_s": Float(telemetry.userCPUSeconds),
+                "runtime/cpu_system_s": Float(telemetry.systemCPUSeconds),
+            ]
+        )
+
+        structuredLogger?.log(
+            event: "resource_telemetry",
+            step: globalStep,
+            fields: [
+                "rss_bytes": "\(telemetry.rssBytes)",
+                "virtual_bytes": "\(telemetry.virtualBytes)",
+                "cpu_user_seconds": "\(telemetry.userCPUSeconds)",
+                "cpu_system_seconds": "\(telemetry.systemCPUSeconds)",
+            ]
+        )
     }
 
     private func enforceStabilityGuards(metrics: DQNTrainStepMetrics, globalStep: Int) throws {

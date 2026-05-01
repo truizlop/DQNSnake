@@ -39,6 +39,9 @@ struct SnakeDQNTrainApp {
             (ProcessInfo.processInfo.environment["SNAKE_OBS_ENABLE"] ?? (config.enableStructuredLogs ? "1" : "0"))
             == "1"
         let structuredLogPath = ProcessInfo.processInfo.environment["SNAKE_OBS_LOG_PATH"] ?? config.structuredLogPath
+        let resourceTelemetryEverySteps =
+            Int(ProcessInfo.processInfo.environment["SNAKE_RESOURCE_TELEMETRY_EVERY_STEPS"] ?? "")
+            ?? config.resourceTelemetryEverySteps
         let mlxDevice = (ProcessInfo.processInfo.environment["SNAKE_MLX_DEVICE"] ?? "cpu").lowercased()
         let trainingSeed = ProcessInfo.processInfo.environment["SNAKE_SEED"].flatMap(Int.init)
         let deviceType = mlxDevice == "gpu" ? MLX_GPU : MLX_CPU
@@ -65,6 +68,7 @@ struct SnakeDQNTrainApp {
         config.tensorBoardPort = tensorBoardPort
         config.enableStructuredLogs = enableStructuredLogs
         config.structuredLogPath = structuredLogPath
+        config.resourceTelemetryEverySteps = resourceTelemetryEverySteps
         config.seed = trainingSeed
 
         var trainer = DQNTrainer(

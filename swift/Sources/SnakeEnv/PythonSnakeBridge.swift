@@ -179,19 +179,21 @@ final class PythonSnakeBridge: SnakeBridgeClient, @unchecked Sendable {
     private func sendRaw<Request: Encodable, Response: Decodable>(_ payload: Request, as: Response.Type) throws
         -> (BaseResponse, Response)
     {
-        lock.lock()
-        defer { lock.unlock() }
+        try autoreleasepool {
+            lock.lock()
+            defer { lock.unlock() }
 
-        let requestData = try encoder.encode(payload)
-        var lineData = requestData
-        lineData.append(0x0A)
+            let requestData = try encoder.encode(payload)
+            var lineData = requestData
+            lineData.append(0x0A)
 
-        try stdinHandle.write(contentsOf: lineData)
-        let responseData = try readLineData()
+            try stdinHandle.write(contentsOf: lineData)
+            let responseData = try readLineData()
 
-        let base = try decodeResponse(BaseResponse.self, from: responseData)
-        let body = try decodeResponse(Response.self, from: responseData)
-        return (base, body)
+            let base = try decodeResponse(BaseResponse.self, from: responseData)
+            let body = try decodeResponse(Response.self, from: responseData)
+            return (base, body)
+        }
     }
 
     private func decodeResponse<Response: Decodable>(_ type: Response.Type, from data: Data) throws -> Response {

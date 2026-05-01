@@ -18,6 +18,7 @@ struct DQNTrainingConfig {
     var tensorBoardPort: Int = 6006
     var enableStructuredLogs: Bool = true
     var structuredLogPath: String = "runs/snake_dqn/observability.jsonl"
+    var resourceTelemetryEverySteps: Int = 100
     var seed: Int? = nil
 
     // DQN scheduling knobs
