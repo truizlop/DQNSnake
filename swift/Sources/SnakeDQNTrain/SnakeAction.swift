@@ -6,8 +6,10 @@
 //
 
 enum SnakeAction: Int, CaseIterable {
-    case up = 0
-    case left = 1
-    case down = 2
-    case right = 3
+    // Must match gym-snake action contract in snake_env.py:
+    // 0=left, 1=up, 2=right, 3=down
+    case left = 0
+    case up = 1
+    case right = 2
+    case down = 3
 }
