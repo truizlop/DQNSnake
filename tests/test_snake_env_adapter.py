@@ -56,6 +56,16 @@ def test_step_returns_expected_contract() -> None:
     assert score == pytest.approx(reward)
 
 
+@pytest.mark.skipif(not HAS_GYM_SNAKE, reason="gym-snake environment unavailable")
+def test_grid_contains_typed_entities() -> None:
+    env = SnakeEnvAdapter(binary_observation=False)
+    grid = env.reset()
+    # 2=head must exist
+    assert (grid == 2).any()
+    # 3=apple must exist
+    assert (grid == 3).any()
+
+
 def test_frame_stack_shape() -> None:
     stack = FrameStack(k=4)
     obs = np.zeros((16, 16), dtype=np.uint8)

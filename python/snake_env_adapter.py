@@ -240,12 +240,14 @@ class SnakeEnvAdapter:
                 snake = list(unwrapped.snake)
                 for index, (x, y) in enumerate(snake):
                     if 0 <= x < dim and 0 <= y < dim:
-                        grid[x, y] = 1
+                        # 1=body, 2=head
+                        grid[x, y] = 2 if index == 0 else 1
 
                 if len(unwrapped.apple) == 2:
                     ax, ay = int(unwrapped.apple[0]), int(unwrapped.apple[1])
                     if 0 <= ax < dim and 0 <= ay < dim:
-                        grid[ax, ay] = 1
+                        # 3=apple
+                        grid[ax, ay] = 3
                 return grid
 
         arr = self._process_obs(obs)
