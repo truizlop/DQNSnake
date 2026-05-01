@@ -27,11 +27,11 @@ private func temporaryDirectoryURL() -> URL {
         saveBestCheckpoint: false
     )
 
-    try manager.maybeSaveStepCheckpoint(saver: saver, globalStep: 1)
+    _ = try manager.maybeSaveStepCheckpoint(saver: saver, globalStep: 1)
     let shouldNotExist = directory.appendingPathComponent("model_step_1.safetensors").path
     #expect(!FileManager.default.fileExists(atPath: shouldNotExist))
 
-    try manager.maybeSaveStepCheckpoint(saver: saver, globalStep: 2)
+    _ = try manager.maybeSaveStepCheckpoint(saver: saver, globalStep: 2)
     let shouldExist = directory.appendingPathComponent("model_step_2.safetensors").path
     #expect(FileManager.default.fileExists(atPath: shouldExist))
 }
@@ -48,7 +48,7 @@ private func temporaryDirectoryURL() -> URL {
     )
 
     let bestPath = directory.appendingPathComponent("model_best.safetensors").path
-    try manager.maybeSaveBestCheckpoint(
+    _ = try manager.maybeSaveBestCheckpoint(
         saver: saver,
         metricValue: 1,
         metricName: "eval_avg_score",
@@ -59,7 +59,7 @@ private func temporaryDirectoryURL() -> URL {
     let firstTimestamp = try FileManager.default.attributesOfItem(atPath: bestPath)[.modificationDate] as? Date
 
     // Lower score should not update best checkpoint.
-    try manager.maybeSaveBestCheckpoint(
+    _ = try manager.maybeSaveBestCheckpoint(
         saver: saver,
         metricValue: 0,
         metricName: "eval_avg_score",

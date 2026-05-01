@@ -24,9 +24,9 @@ struct DQNCheckpointManager {
     mutating func maybeSaveStepCheckpoint(
         saver: some DQNModelCheckpointSaving,
         globalStep: Int
-    ) throws {
+    ) throws -> Bool {
         guard checkpointEverySteps > 0, globalStep > 0, globalStep % checkpointEverySteps == 0 else {
-            return
+            return false
         }
         try createDirectoryIfNeeded()
         let url = directoryURL.appendingPathComponent("model_step_\(globalStep).safetensors")
@@ -34,6 +34,7 @@ struct DQNCheckpointManager {
             to: url,
             metadata: ["global_step": "\(globalStep)", "kind": "periodic"]
         )
+        return true
     }
 
     mutating func maybeSaveBestCheckpoint(
@@ -41,12 +42,12 @@ struct DQNCheckpointManager {
         metricValue: Float,
         metricName: String,
         metadata: [String: String]
-    ) throws {
+    ) throws -> Bool {
         guard
             saveBestCheckpoint,
             bestScore == nil || metricValue > bestScore!
         else {
-            return
+            return false
         }
         bestScore = metricValue
         try createDirectoryIfNeeded()
@@ -59,6 +60,7 @@ struct DQNCheckpointManager {
             to: url,
             metadata: mergedMetadata
         )
+        return true
     }
 
     private func createDirectoryIfNeeded() throws {

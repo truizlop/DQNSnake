@@ -39,7 +39,10 @@ final class DQNLearner {
     func greedyAction(for state: MLXArray) -> SnakeAction {
         let qValues = onlineQNetwork(state)
         let greedyActionIndex = qValues.argMax().item(Int.self)
-        return SnakeAction(rawValue: greedyActionIndex) ?? .up
+        guard let action = SnakeAction(rawValue: greedyActionIndex) else {
+            preconditionFailure("Invalid greedy action index produced by model: \(greedyActionIndex)")
+        }
+        return action
     }
 
     func syncTargetFromOnline() {

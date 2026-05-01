@@ -123,6 +123,9 @@ final class PythonSnakeBridge: SnakeBridgeClient, @unchecked Sendable {
             _ = try bridge.send(CreateEnvRequest(envName: nil, seed: seed), as: EmptyResponse.self)
             return bridge
         } catch {
+            if process.isRunning {
+                process.terminate()
+            }
             return nil
         }
     }

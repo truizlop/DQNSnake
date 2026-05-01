@@ -165,7 +165,7 @@ struct DQNTrainer {
                         "eval_avg_score": "\(evaluation.averageScore)",
                     ]
                 )
-                try checkpointManager.maybeSaveBestCheckpoint(
+                let savedBest = try checkpointManager.maybeSaveBestCheckpoint(
                     saver: learner,
                     metricValue: evaluation.averageScore,
                     metricName: "eval_avg_score",
@@ -177,15 +177,17 @@ struct DQNTrainer {
                         "eval_avg_score": "\(evaluation.averageScore)",
                     ]
                 )
-                structuredLogger?.log(
-                    event: "checkpoint_best_saved",
-                    step: globalStep,
-                    fields: [
-                        "episode": "\(episode)",
-                        "metric_name": "eval_avg_score",
-                        "metric_value": "\(evaluation.averageScore)",
-                    ]
-                )
+                if savedBest {
+                    structuredLogger?.log(
+                        event: "checkpoint_best_saved",
+                        step: globalStep,
+                        fields: [
+                            "episode": "\(episode)",
+                            "metric_name": "eval_avg_score",
+                            "metric_value": "\(evaluation.averageScore)",
+                        ]
+                    )
+                }
                 tensorBoardPublisher?.publish(
                     step: globalStep,
                     scalars: [
@@ -234,8 +236,8 @@ struct DQNTrainer {
                 fields: ["target_sync_every": "\(config.targetSyncEvery)"]
             )
         }
-        try checkpointManager.maybeSaveStepCheckpoint(saver: learner, globalStep: globalStep)
-        if config.checkpointEverySteps > 0 && globalStep > 0 && globalStep % config.checkpointEverySteps == 0 {
+        let savedPeriodic = try checkpointManager.maybeSaveStepCheckpoint(saver: learner, globalStep: globalStep)
+        if savedPeriodic {
             structuredLogger?.log(
                 event: "checkpoint_periodic_saved",
                 step: globalStep,

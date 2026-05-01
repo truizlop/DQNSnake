@@ -30,7 +30,7 @@ public actor SnakeEnv {
     }
 
     public func step(action: Int) async throws -> StepResult {
-        guard action >= 0 else {
+        guard (0...3).contains(action) else {
             throw SnakeEnvError.invalidAction
         }
 
