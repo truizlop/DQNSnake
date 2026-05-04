@@ -42,6 +42,16 @@ struct SnakeDQNTrainApp {
         let resourceTelemetryEverySteps =
             Int(ProcessInfo.processInfo.environment["SNAKE_RESOURCE_TELEMETRY_EVERY_STEPS"] ?? "")
             ?? config.resourceTelemetryEverySteps
+        let enableBestEpisodeGIFCapture =
+            (ProcessInfo.processInfo.environment["SNAKE_BEST_GIF_ENABLE"]
+                ?? (config.enableBestEpisodeGIFCapture ? "1" : "0")) == "1"
+        let bestEpisodeGIFDirectory =
+            ProcessInfo.processInfo.environment["SNAKE_BEST_GIF_DIR"] ?? config.bestEpisodeGIFDirectory
+        let bestEpisodeGIFScale =
+            Int(ProcessInfo.processInfo.environment["SNAKE_BEST_GIF_SCALE"] ?? "") ?? config.bestEpisodeGIFScale
+        let bestEpisodeGIFFrameDurationMs =
+            Int(ProcessInfo.processInfo.environment["SNAKE_BEST_GIF_FRAME_MS"] ?? "")
+            ?? config.bestEpisodeGIFFrameDurationMs
         let mlxDevice = (ProcessInfo.processInfo.environment["SNAKE_MLX_DEVICE"] ?? "cpu").lowercased()
         let trainingSeed = ProcessInfo.processInfo.environment["SNAKE_SEED"].flatMap(Int.init)
         let deviceType = mlxDevice == "gpu" ? MLX_GPU : MLX_CPU
@@ -69,6 +79,10 @@ struct SnakeDQNTrainApp {
         config.enableStructuredLogs = enableStructuredLogs
         config.structuredLogPath = structuredLogPath
         config.resourceTelemetryEverySteps = resourceTelemetryEverySteps
+        config.enableBestEpisodeGIFCapture = enableBestEpisodeGIFCapture
+        config.bestEpisodeGIFDirectory = bestEpisodeGIFDirectory
+        config.bestEpisodeGIFScale = bestEpisodeGIFScale
+        config.bestEpisodeGIFFrameDurationMs = bestEpisodeGIFFrameDurationMs
         config.seed = trainingSeed
 
         var trainer = DQNTrainer(

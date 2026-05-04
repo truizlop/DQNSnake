@@ -15,6 +15,7 @@ struct DQNTrainer {
     var tensorBoardPublisher: TensorBoardMetricsPublisher?
     var structuredLogger: DQNStructuredLogger?
     var stabilityTracker: DQNStabilityTracker
+    var bestTrainingEpisodeScore: Float?
 
     init(env: SnakeEnv, config: DQNTrainingConfig = DQNTrainingConfig()) {
         self.env = env
@@ -48,6 +49,7 @@ struct DQNTrainer {
         self.tensorBoardPublisher = nil
         self.structuredLogger = nil
         self.stabilityTracker = DQNStabilityTracker()
+        self.bestTrainingEpisodeScore = nil
     }
 
     mutating func run() async throws {
@@ -116,6 +118,7 @@ struct DQNTrainer {
                     "train/episode_reward": episodeResult.totalReward,
                     "train/episode_score": episodeResult.finalScore,
                     "train/episode_steps": Float(episodeResult.steps),
+                    "train/episode_apples": Float(episodeResult.applesEaten),
                     "train/replay_size": Float(replayBuffer.count),
                     "train/replay_fill_ratio": Float(replayBuffer.count) / Float(config.replayBufferCapacity),
                     "train/epsilon": explorationPolicy.epsilon(at: globalStep),
@@ -134,6 +137,7 @@ struct DQNTrainer {
                     "episode_steps": "\(episodeResult.steps)",
                     "episode_reward": "\(episodeResult.totalReward)",
                     "episode_score": "\(episodeResult.finalScore)",
+                    "episode_apples": "\(episodeResult.applesEaten)",
                     "episode_duration_s": "\(Date().timeIntervalSince(episodeStart))",
                     "epsilon": "\(explorationPolicy.epsilon(at: globalStep))",
                     "replay_size": "\(replayBuffer.count)",
@@ -144,6 +148,11 @@ struct DQNTrainer {
                     "action_right": "\(episodeResult.actionCounts[.right] ?? 0)",
                 ]
             )
+            try await maybeCaptureBestTrainingEpisodeGIF(
+                episode: episode,
+                episodeResult: episodeResult,
+                globalStep: globalStep
+            )
 
             if shouldEvaluate(episode: episode) {
                 let evaluation = try await evaluator.evaluate(
@@ -153,7 +162,7 @@ struct DQNTrainer {
                     }
                 )
                 print(
-                    "eval episode=\(episode) episodes=\(evaluation.episodes) avgReward=\(evaluation.averageReward) avgScore=\(evaluation.averageScore)"
+                    "eval episode=\(episode) episodes=\(evaluation.episodes) avgReward=\(evaluation.averageReward) avgScore=\(evaluation.averageScore) avgApples=\(evaluation.averageApples)"
                 )
                 structuredLogger?.log(
                     event: "evaluation",
@@ -163,6 +172,7 @@ struct DQNTrainer {
                         "eval_episodes": "\(evaluation.episodes)",
                         "eval_avg_reward": "\(evaluation.averageReward)",
                         "eval_avg_score": "\(evaluation.averageScore)",
+                        "eval_avg_apples": "\(evaluation.averageApples)",
                     ]
                 )
                 let savedBest = try checkpointManager.maybeSaveBestCheckpoint(
@@ -175,6 +185,7 @@ struct DQNTrainer {
                         "eval_episodes": "\(evaluation.episodes)",
                         "eval_avg_reward": "\(evaluation.averageReward)",
                         "eval_avg_score": "\(evaluation.averageScore)",
+                        "eval_avg_apples": "\(evaluation.averageApples)",
                     ]
                 )
                 if savedBest {
@@ -193,6 +204,7 @@ struct DQNTrainer {
                     scalars: [
                         "eval/avg_reward": evaluation.averageReward,
                         "eval/avg_score": evaluation.averageScore,
+                        "eval/avg_apples": evaluation.averageApples,
                     ]
                 )
             }
@@ -372,12 +384,54 @@ struct DQNTrainer {
 
     private func episodeLogLine(episode: Int, episodeResult: DQNEpisodeResult, globalStep: Int) -> String {
         var line =
-            "episode=\(episode) steps=\(episodeResult.steps) reward=\(episodeResult.totalReward) score=\(episodeResult.finalScore) globalStep=\(globalStep)"
+            "episode=\(episode) steps=\(episodeResult.steps) reward=\(episodeResult.totalReward) score=\(episodeResult.finalScore) apples=\(episodeResult.applesEaten) globalStep=\(globalStep)"
         if let metrics = lastTrainStepMetrics {
             line +=
                 " trainLoss=\(metrics.loss) qMeanAbs=\(metrics.meanAbsQ) qMaxAbs=\(metrics.maxAbsQ) gradL2=\(metrics.gradientL2Norm) skippedUpdate=\(metrics.skippedUpdate)"
         }
         return line
+    }
+
+    private mutating func maybeCaptureBestTrainingEpisodeGIF(
+        episode: Int,
+        episodeResult: DQNEpisodeResult,
+        globalStep: Int
+    ) async throws {
+        guard config.enableBestEpisodeGIFCapture else {
+            return
+        }
+        let previousBest = bestTrainingEpisodeScore ?? -.infinity
+        guard episodeResult.finalScore > previousBest else {
+            return
+        }
+
+        bestTrainingEpisodeScore = episodeResult.finalScore
+
+        let scoreTag = String(format: "%.3f", episodeResult.finalScore)
+            .replacingOccurrences(of: "-", with: "m")
+            .replacingOccurrences(of: ".", with: "p")
+        let filename = "best_ep_\(episode)_step_\(globalStep)_score_\(scoreTag).gif"
+        let directory = URL(fileURLWithPath: config.bestEpisodeGIFDirectory, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let path = directory.appendingPathComponent(filename).path
+
+        let frameCount = try await env.saveLastEpisodeGIF(
+            path: path,
+            scale: config.bestEpisodeGIFScale,
+            frameDurationMs: config.bestEpisodeGIFFrameDurationMs
+        )
+
+        structuredLogger?.log(
+            event: "best_episode_gif_saved",
+            step: globalStep,
+            fields: [
+                "episode": "\(episode)",
+                "episode_score": "\(episodeResult.finalScore)",
+                "episode_apples": "\(episodeResult.applesEaten)",
+                "gif_path": path,
+                "gif_frames": "\(frameCount)",
+            ]
+        )
     }
 
     private func maybeResumeFromCheckpoint() throws -> Int {

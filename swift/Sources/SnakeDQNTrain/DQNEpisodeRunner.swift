@@ -5,6 +5,7 @@ import SnakeEnv
 struct DQNEpisodeRunner {
     let env: SnakeEnv
     let maxStepsPerEpisode: Int
+    private let appleRewardThreshold: Float = 0.5
 
     func runEpisode(
         globalStep: inout Int,
@@ -15,6 +16,7 @@ struct DQNEpisodeRunner {
         var stepsInEpisode = 0
         var totalReward: Float = 0
         var finalScore: Float = 0
+        var applesEaten = 0
         var actionCounts = Dictionary(uniqueKeysWithValues: SnakeAction.allCases.map { ($0, 0) })
 
         let initial = try await env.reset()
@@ -45,6 +47,9 @@ struct DQNEpisodeRunner {
 
             totalReward += stepResult.reward
             finalScore = stepResult.score
+            if stepResult.reward > appleRewardThreshold {
+                applesEaten += 1
+            }
             state = nextState
             globalStep += 1
             stepsInEpisode += 1
@@ -58,6 +63,7 @@ struct DQNEpisodeRunner {
             steps: stepsInEpisode,
             totalReward: totalReward,
             finalScore: finalScore,
+            applesEaten: applesEaten,
             actionCounts: actionCounts
         )
     }

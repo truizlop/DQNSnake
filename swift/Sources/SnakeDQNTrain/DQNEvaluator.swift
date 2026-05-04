@@ -5,6 +5,7 @@ import SnakeEnv
 struct DQNEvaluator {
     let env: SnakeEnv
     let maxStepsPerEpisode: Int
+    private let appleRewardThreshold: Float = 0.5
 
     func evaluate(
         episodes: Int,
@@ -14,17 +15,20 @@ struct DQNEvaluator {
 
         var totalReward: Float = 0
         var totalScore: Float = 0
+        var totalApples = 0
 
         for _ in 0..<episodes {
             let episodeResult = try await runEvaluationEpisode(selectAction: selectAction)
             totalReward += episodeResult.totalReward
             totalScore += episodeResult.finalScore
+            totalApples += episodeResult.applesEaten
         }
 
         return DQNEvaluationResult(
             episodes: episodes,
             averageReward: totalReward / Float(episodes),
-            averageScore: totalScore / Float(episodes)
+            averageScore: totalScore / Float(episodes),
+            averageApples: Float(totalApples) / Float(episodes)
         )
     }
 
@@ -34,6 +38,7 @@ struct DQNEvaluator {
         var stepsInEpisode = 0
         var totalReward: Float = 0
         var finalScore: Float = 0
+        var applesEaten = 0
 
         let initial = try await env.reset()
         var frameStack = FrameStack(capacity: 4)
@@ -53,6 +58,9 @@ struct DQNEvaluator {
 
             totalReward += stepResult.reward
             finalScore = stepResult.score
+            if stepResult.reward > appleRewardThreshold {
+                applesEaten += 1
+            }
             state = nextState
             stepsInEpisode += 1
 
@@ -65,6 +73,7 @@ struct DQNEvaluator {
             steps: stepsInEpisode,
             totalReward: totalReward,
             finalScore: finalScore,
+            applesEaten: applesEaten,
             actionCounts: [:]
         )
     }

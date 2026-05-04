@@ -19,6 +19,10 @@ struct DQNTrainingConfig {
     var enableStructuredLogs: Bool = true
     var structuredLogPath: String = "runs/snake_dqn/observability.jsonl"
     var resourceTelemetryEverySteps: Int = 100
+    var enableBestEpisodeGIFCapture: Bool = true
+    var bestEpisodeGIFDirectory: String = "runs/best_episode_gifs"
+    var bestEpisodeGIFScale: Int = 8
+    var bestEpisodeGIFFrameDurationMs: Int = 80
     var seed: Int? = nil
 
     // DQN scheduling knobs
