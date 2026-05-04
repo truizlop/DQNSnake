@@ -21,6 +21,7 @@ Single-player Snake training stack with:
   - training quality checks (loss/Q scale/gradient norm + skip-on-invalid update)
 - TensorBoard integration from Swift training process
 - Structured JSONL observability event log
+- Automatic GIF capture for new best training episodes
 
 ## Repository structure
 
@@ -105,6 +106,10 @@ TensorBoard env vars:
 Observability env vars:
 - `SNAKE_OBS_ENABLE` (`1` default)
 - `SNAKE_OBS_LOG_PATH` (default `runs/snake_dqn/observability.jsonl`)
+- `SNAKE_BEST_GIF_ENABLE` (`1` default)
+- `SNAKE_BEST_GIF_DIR` (default `runs/best_episode_gifs`)
+- `SNAKE_BEST_GIF_SCALE` (default `8`)
+- `SNAKE_BEST_GIF_FRAME_MS` (default `80`)
 
 ## TensorBoard usage
 
@@ -145,6 +150,8 @@ Logged scalar groups:
 - `runtime/cpu_system_s`
 - `eval/avg_reward`
 - `eval/avg_score`
+- `train/episode_apples`
+- `eval/avg_apples`
 
 Structured log event stream (`SNAKE_OBS_LOG_PATH`) includes:
 - `run_start`
@@ -155,6 +162,7 @@ Structured log event stream (`SNAKE_OBS_LOG_PATH`) includes:
 - `target_sync`
 - `checkpoint_periodic_saved`
 - `checkpoint_best_saved`
+- `best_episode_gif_saved`
 - `stability_guard_triggered`
 - `resource_telemetry`
 
