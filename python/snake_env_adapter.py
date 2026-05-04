@@ -8,10 +8,12 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass
+import os
 import random
 from typing import Any
 
 import numpy as np
+from PIL import Image
 
 try:
     import gym
@@ -66,17 +68,23 @@ class SnakeEnvAdapter:
         self.obs: np.ndarray | None = None
         self.done = False
         self.score = 0.0
+        self._current_episode_frames: list[np.ndarray] = []
+        self._last_episode_frames: list[np.ndarray] = []
         self._reset_count = 0
         self._seed_env_rngs()
 
     def reset(self) -> np.ndarray:
+        if self._current_episode_frames:
+            self._last_episode_frames = [frame.copy() for frame in self._current_episode_frames]
         reset_seed = self._next_reset_seed()
         raw = self._reset_with_seed(reset_seed)
         self.obs = self._extract_obs_from_reset(raw)
         self._enforce_initial_length()
         self.done = False
         self.score = 0.0
-        return self._obs_to_grid(self.obs)
+        grid = self._obs_to_grid(self.obs)
+        self._current_episode_frames = [grid.copy()]
+        return grid
 
     def step(self, action: int) -> tuple[np.ndarray, float, bool, float]:
         safe_action = self._sanitize_action(action)
@@ -94,7 +102,44 @@ class SnakeEnvAdapter:
             done=self.done,
             score=float(self.score),
         )
+        self._current_episode_frames.append(output.observation.copy())
+        if self.done:
+            self._last_episode_frames = [frame.copy() for frame in self._current_episode_frames]
         return output.observation, output.reward, output.done, output.score
+
+    def save_last_episode_gif(
+        self, path: str, scale: int = 8, frame_duration_ms: int = 80
+    ) -> int:
+        frames = self._last_episode_frames or self._current_episode_frames
+        if not frames:
+            raise RuntimeError("No episode frames available to export.")
+
+        directory = os.path.dirname(path)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+        scale = max(1, int(scale))
+        frame_duration_ms = max(10, int(frame_duration_ms))
+
+        pil_frames = []
+        for grid in frames:
+            rgb = self._grid_to_rgb(grid)
+            image = Image.fromarray(rgb, mode="RGB")
+            if scale > 1:
+                image = image.resize(
+                    (image.width * scale, image.height * scale),
+                    Image.Resampling.NEAREST,
+                )
+            pil_frames.append(image)
+
+        pil_frames[0].save(
+            path,
+            save_all=True,
+            append_images=pil_frames[1:],
+            duration=frame_duration_ms,
+            loop=0,
+            optimize=False,
+        )
+        return len(pil_frames)
 
     def _sanitize_action(self, action: int) -> int:
         unwrapped = getattr(self.env, "unwrapped", None)
@@ -298,6 +343,14 @@ class SnakeEnvAdapter:
         row_idx = (np.arange(dst) * src_h / dst).astype(np.int64)
         col_idx = (np.arange(dst) * src_w / dst).astype(np.int64)
         return grid[row_idx][:, col_idx]
+
+    @staticmethod
+    def _grid_to_rgb(grid: np.ndarray) -> np.ndarray:
+        rgb = np.zeros((grid.shape[0], grid.shape[1], 3), dtype=np.uint8)
+        rgb[grid == 1] = np.array([30, 180, 30], dtype=np.uint8)  # body
+        rgb[grid == 2] = np.array([120, 255, 120], dtype=np.uint8)  # head
+        rgb[grid == 3] = np.array([220, 40, 40], dtype=np.uint8)  # apple
+        return rgb
 
 
 class FrameStack:

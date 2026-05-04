@@ -6,6 +6,7 @@ protocol SnakeBridgeClient: Sendable {
     func score() -> Float
     func isDone() -> Bool
     func render() throws
+    func saveLastEpisodeGIF(path: String, scale: Int, frameDurationMs: Int) throws -> Int
 }
 
 public actor SnakeEnv {
@@ -55,6 +56,10 @@ public actor SnakeEnv {
 
     public func render() async throws {
         try bridge.render()
+    }
+
+    public func saveLastEpisodeGIF(path: String, scale: Int = 8, frameDurationMs: Int = 80) async throws -> Int {
+        try bridge.saveLastEpisodeGIF(path: path, scale: scale, frameDurationMs: frameDurationMs)
     }
 
     private func flatten(grid: [[UInt8]]) throws -> Frame {

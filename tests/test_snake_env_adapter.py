@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import os
 import sys
+import tempfile
 
 import numpy as np
 import pytest
@@ -109,3 +110,18 @@ def test_sanitize_action_for_snake_blocks_reverse_turn() -> None:
     snake_up = [[4, 5], [5, 5], [6, 5]]
     assert SnakeEnvAdapter._sanitize_action_for_snake(3, snake_up) == 1
     assert SnakeEnvAdapter._sanitize_action_for_snake(0, snake_up) == 0
+
+
+def test_save_last_episode_gif_writes_file() -> None:
+    adapter = object.__new__(SnakeEnvAdapter)
+    frame = np.zeros((8, 8), dtype=np.uint8)
+    frame[2, 3] = 2
+    frame[5, 6] = 3
+    adapter._current_episode_frames = [frame.copy(), frame.copy()]
+    adapter._last_episode_frames = []
+
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "episode.gif")
+        frame_count = adapter.save_last_episode_gif(path=path, scale=2, frame_duration_ms=40)
+        assert frame_count == 2
+        assert os.path.exists(path)

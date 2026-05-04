@@ -60,6 +60,28 @@ final class PythonSnakeBridge: SnakeBridgeClient, @unchecked Sendable {
         let cmd: String = "render"
     }
 
+    private struct SaveLastEpisodeGIFRequest: Encodable {
+        let cmd: String = "save_last_episode_gif"
+        let path: String
+        let scale: Int
+        let frameDurationMs: Int
+
+        enum CodingKeys: String, CodingKey {
+            case cmd
+            case path
+            case scale
+            case frameDurationMs = "frame_duration_ms"
+        }
+    }
+
+    private struct SaveLastEpisodeGIFResponse: Decodable {
+        let frameCount: Int
+
+        enum CodingKeys: String, CodingKey {
+            case frameCount = "frame_count"
+        }
+    }
+
     private struct QuitRequest: Encodable {
         let cmd: String = "quit"
     }
@@ -166,6 +188,14 @@ final class PythonSnakeBridge: SnakeBridgeClient, @unchecked Sendable {
 
     func render() throws {
         _ = try send(RenderRequest(), as: EmptyResponse.self)
+    }
+
+    func saveLastEpisodeGIF(path: String, scale: Int, frameDurationMs: Int) throws -> Int {
+        let response = try send(
+            SaveLastEpisodeGIFRequest(path: path, scale: scale, frameDurationMs: frameDurationMs),
+            as: SaveLastEpisodeGIFResponse.self
+        )
+        return response.frameCount
     }
 
     private func send<Request: Encodable, Response: Decodable>(_ payload: Request, as: Response.Type) throws

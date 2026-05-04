@@ -180,3 +180,31 @@ def test_bridge_server_supports_configured_env_dim_and_grid_size() -> None:
             pass
         server.kill()
         server.wait(timeout=5)
+
+
+def test_bridge_server_can_save_last_episode_gif() -> None:
+    import tempfile
+
+    server = _start_bridge_server()
+    try:
+        assert _send(server, {"cmd": "create_env", "seed": 7})["ok"] is True
+        assert _send(server, {"cmd": "reset"})["ok"] is True
+        _send(server, {"cmd": "step", "action": 0})
+        _send(server, {"cmd": "step", "action": 1})
+
+        with tempfile.TemporaryDirectory() as d:
+            path = str(Path(d) / "best.gif")
+            resp = _send(
+                server,
+                {"cmd": "save_last_episode_gif", "path": path, "scale": 2, "frame_duration_ms": 40},
+            )
+            assert resp["ok"] is True
+            assert int(resp["frame_count"]) >= 1
+            assert Path(path).exists()
+    finally:
+        try:
+            _send(server, {"cmd": "quit"})
+        except Exception:
+            pass
+        server.kill()
+        server.wait(timeout=5)

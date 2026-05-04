@@ -21,6 +21,10 @@ struct MockBridge: SnakeBridgeClient {
     }
 
     func render() throws {}
+
+    func saveLastEpisodeGIF(path _: String, scale _: Int, frameDurationMs _: Int) throws -> Int {
+        0
+    }
 }
 
 @Test func frameStackFlattensFourFrames() {

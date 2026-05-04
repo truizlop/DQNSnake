@@ -20,4 +20,8 @@ struct UnavailableSnakeBridge: SnakeBridgeClient {
     func render() throws {
         throw SnakeEnvError.bridgeUnavailable
     }
+
+    func saveLastEpisodeGIF(path _: String, scale _: Int, frameDurationMs _: Int) throws -> Int {
+        throw SnakeEnvError.bridgeUnavailable
+    }
 }

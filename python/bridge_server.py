@@ -101,6 +101,19 @@ def main() -> int:
                 _ok()
                 continue
 
+            if cmd == "save_last_episode_gif":
+                path = request["path"]
+                scale = int(request.get("scale", 8))
+                frame_duration_ms = int(request.get("frame_duration_ms", 80))
+                with contextlib.redirect_stdout(sys.stderr):
+                    frame_count = _require_env().save_last_episode_gif(
+                        path=path,
+                        scale=scale,
+                        frame_duration_ms=frame_duration_ms,
+                    )
+                _ok(frame_count=frame_count)
+                continue
+
             if cmd == "quit":
                 _ok()
                 return 0
