@@ -18,6 +18,9 @@ final class DQNLearner {
         self.targetQNetwork = DQNModel()
         self.gamma = gamma
         self.optimizer = Adam(learningRate: learningRate)
+        // Start with a consistent target network; otherwise early TD targets are random/noisy
+        // until the first periodic sync.
+        self.targetQNetwork.update(parameters: self.onlineQNetwork.parameters())
         self.lossAndGrad = valueAndGrad(model: onlineQNetwork) { [targetQNetwork] model, arrays in
             let states = arrays[0]
             let nextStates = arrays[1]
