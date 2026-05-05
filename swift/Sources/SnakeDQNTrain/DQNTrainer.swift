@@ -23,6 +23,8 @@ struct DQNTrainer {
         self.replayBuffer = ReplayBuffer(
             capacity: config.replayBufferCapacity,
             samplingStrategy: config.replaySamplingStrategy,
+            prioritizedAlpha: config.prioritizedReplayAlpha,
+            prioritizedEpsilon: config.prioritizedReplayEpsilon,
             seed: config.seed
         )
         self.learner = DQNLearner(
@@ -83,6 +85,10 @@ struct DQNTrainer {
             fields: [
                 "seed": config.seed.map(String.init) ?? "none",
                 "replay_sampling_strategy": "\(config.replaySamplingStrategy)",
+                "prioritized_replay_alpha": "\(config.prioritizedReplayAlpha)",
+                "prioritized_replay_beta_start": "\(config.prioritizedReplayBetaStart)",
+                "prioritized_replay_beta_anneal_steps": "\(config.prioritizedReplayBetaAnnealSteps)",
+                "prioritized_replay_epsilon": "\(config.prioritizedReplayEpsilon)",
                 "train_every": "\(config.trainEvery)",
                 "batch_size": "\(config.batchSize)",
                 "max_consecutive_skipped_updates": "\(config.maxConsecutiveSkippedUpdates)",
@@ -265,8 +271,10 @@ struct DQNTrainer {
 
     private mutating func optimizeFromReplay(globalStep: Int) throws {
         let startedAt = Date()
-        let transitions = replayBuffer.sample(batchSize: config.batchSize)
-        let batch = DQNBatch(transitions: transitions)
+        let sample = replayBuffer.sample(batchSize: config.batchSize, importanceSamplingBeta: prioritizedReplayBeta(at: globalStep))
+        let batch = DQNBatch(transitions: sample.transitions, importanceWeights: sample.importanceWeights)
+        let tdErrors = learner.tdErrors(batch: batch)
+        replayBuffer.updatePriorities(indices: sample.indices, tdErrors: tdErrors)
         lastTrainStepMetrics = learner.trainStep(batch: batch)
         if let metrics = lastTrainStepMetrics {
             stabilityTracker.record(trainStepMetrics: metrics)
@@ -297,9 +305,23 @@ struct DQNTrainer {
                     "optimize_duration_s": "\(optimizeDuration)",
                     "batch_size": "\(config.batchSize)",
                     "replay_size": "\(replayBuffer.count)",
+                    "replay_beta": "\(prioritizedReplayBeta(at: globalStep))",
                 ]
             )
         }
+    }
+
+    private func prioritizedReplayBeta(at globalStep: Int) -> Float {
+        guard config.replaySamplingStrategy == .prioritized else {
+            return 1
+        }
+        guard config.prioritizedReplayBetaAnnealSteps > 0 else {
+            return 1
+        }
+        let clamped = min(max(globalStep, 0), config.prioritizedReplayBetaAnnealSteps)
+        let progress = Float(clamped) / Float(config.prioritizedReplayBetaAnnealSteps)
+        let beta = config.prioritizedReplayBetaStart + (1 - config.prioritizedReplayBetaStart) * progress
+        return min(max(beta, 0), 1)
     }
 
     private func maybeEmitResourceTelemetry(globalStep: Int) {

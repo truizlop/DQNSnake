@@ -13,6 +13,19 @@ struct SnakeDQNTrainApp {
         var config = DQNHyperparameterBaseline.snakeV1
 
         let steps = Int(ProcessInfo.processInfo.environment["SNAKE_STEPS"] ?? "") ?? config.totalEnvironmentSteps
+        let replaySamplingStrategy = ReplaySamplingStrategy(
+            envValue: ProcessInfo.processInfo.environment["SNAKE_REPLAY_SAMPLING_STRATEGY"] ?? ""
+        ) ?? config.replaySamplingStrategy
+        let prioritizedReplayAlpha =
+            Float(ProcessInfo.processInfo.environment["SNAKE_PER_ALPHA"] ?? "") ?? config.prioritizedReplayAlpha
+        let prioritizedReplayBetaStart =
+            Float(ProcessInfo.processInfo.environment["SNAKE_PER_BETA_START"] ?? "")
+            ?? config.prioritizedReplayBetaStart
+        let prioritizedReplayBetaAnnealSteps =
+            Int(ProcessInfo.processInfo.environment["SNAKE_PER_BETA_ANNEAL_STEPS"] ?? "")
+            ?? config.prioritizedReplayBetaAnnealSteps
+        let prioritizedReplayEpsilon =
+            Float(ProcessInfo.processInfo.environment["SNAKE_PER_EPSILON"] ?? "") ?? config.prioritizedReplayEpsilon
         let maxEpisodeSteps =
             Int(ProcessInfo.processInfo.environment["SNAKE_MAX_EPISODE_STEPS"] ?? "") ?? config.maxStepsPerEpisode
         let resumeCheckpointPath = ProcessInfo.processInfo.environment["SNAKE_RESUME_CHECKPOINT"]
@@ -66,6 +79,11 @@ struct SnakeDQNTrainApp {
         }
 
         config.totalEnvironmentSteps = steps
+        config.replaySamplingStrategy = replaySamplingStrategy
+        config.prioritizedReplayAlpha = prioritizedReplayAlpha
+        config.prioritizedReplayBetaStart = prioritizedReplayBetaStart
+        config.prioritizedReplayBetaAnnealSteps = prioritizedReplayBetaAnnealSteps
+        config.prioritizedReplayEpsilon = prioritizedReplayEpsilon
         config.maxStepsPerEpisode = maxEpisodeSteps
         config.resumeCheckpointPath = resumeCheckpointPath
         config.evalEveryEpisodes = evalEveryEpisodes

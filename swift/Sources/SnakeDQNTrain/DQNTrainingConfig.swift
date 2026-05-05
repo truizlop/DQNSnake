@@ -6,6 +6,10 @@ struct DQNTrainingConfig {
     var maxStepsPerEpisode: Int = 10_000
     var replayBufferCapacity: Int = 100_000
     var replaySamplingStrategy: ReplaySamplingStrategy = .withReplacement
+    var prioritizedReplayAlpha: Float = 0.6
+    var prioritizedReplayBetaStart: Float = 0.4
+    var prioritizedReplayBetaAnnealSteps: Int = 1_000_000
+    var prioritizedReplayEpsilon: Float = 1e-3
     var checkpointDirectory: String = "checkpoints"
     var checkpointEverySteps: Int = 10_000
     var saveBestCheckpoint: Bool = true

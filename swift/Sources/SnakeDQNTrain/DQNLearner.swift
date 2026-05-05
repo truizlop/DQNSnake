@@ -45,8 +45,10 @@ final class DQNLearner {
                 maxNextQ = Self.gatherActionValues(qValues: nextTargetQValues, actions: nextGreedyActions)
             }
             let targetQ = rewards + gamma * notDoneMask * maxNextQ
-
-            return [mseLoss(predictions: predictedQ, targets: targetQ, reduction: .mean)]
+            let tdError = predictedQ - targetQ
+            let weightedSquaredError = arrays[5] * tdError.square()
+            let loss = weightedSquaredError.mean()
+            return [loss]
         }
     }
 
@@ -105,7 +107,7 @@ final class DQNLearner {
 
         let (values, gradients) = lossAndGrad(
             onlineQNetwork,
-            [batch.states, batch.nextStates, batch.actions, batch.rewards, batch.notDoneMask]
+            [batch.states, batch.nextStates, batch.actions, batch.rewards, batch.notDoneMask, batch.importanceWeights]
         )
         let loss = values[0].item(Float.self)
         let gradientsFinite = Self.allFinite(parameters: gradients)
@@ -124,6 +126,27 @@ final class DQNLearner {
             gradientL2Norm: gradientL2Norm,
             skippedUpdate: shouldSkipUpdate
         )
+    }
+
+    func tdErrors(batch: DQNBatch) -> [Float] {
+        let qValues = onlineQNetwork(batch.states)
+        let predictedQ = Self.gatherActionValues(qValues: qValues, actions: batch.actions)
+
+        let nextValue: MLXArray
+        switch dqnAlgorithm {
+        case .single:
+            let nextQValues = targetQNetwork(batch.nextStates)
+            nextValue = nextQValues.max(axis: 1)
+        case .double:
+            let nextOnlineQValues = onlineQNetwork(batch.nextStates)
+            let nextGreedyActions = nextOnlineQValues.argMax(axis: 1)
+            let nextTargetQValues = targetQNetwork(batch.nextStates)
+            nextValue = Self.gatherActionValues(qValues: nextTargetQValues, actions: nextGreedyActions)
+        }
+
+        let targetQ = batch.rewards + gamma * batch.notDoneMask * nextValue
+        let absTdError = (predictedQ - targetQ).abs().asType(.float32)
+        return absTdError.asArray(Float.self)
     }
 
     private static func allFinite(parameters: ModuleParameters) -> Bool {
