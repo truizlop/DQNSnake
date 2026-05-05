@@ -36,6 +36,7 @@ struct DQNTrainingConfig {
     var maxLossForUpdate: Float = 1_000_000
     var maxAbsQValue: Float = 1_000_000
     var maxGradientL2Norm: Float = 1_000_000
+    var dqnAlgorithm: DQNAlgorithm = .double
 
     // Epsilon-greedy schedule
     var epsilonStart: Float = 1.0

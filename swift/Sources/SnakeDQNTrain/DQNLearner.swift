@@ -11,12 +11,14 @@ final class DQNLearner {
     // targetQ = reward + gamma * (1 - done) * max_a' Q_target(nextState, a').
     // gamma near 0 emphasizes immediate rewards; gamma near 1 values long-term return.
     private let gamma: Float
+    private let dqnAlgorithm: DQNAlgorithm
     private let lossAndGrad: (DQNModel, [MLXArray]) -> ([MLXArray], ModuleParameters)
 
-    init(gamma: Float, learningRate: Float) {
+    init(gamma: Float, learningRate: Float, dqnAlgorithm: DQNAlgorithm) {
         self.onlineQNetwork = DQNModel()
         self.targetQNetwork = DQNModel()
         self.gamma = gamma
+        self.dqnAlgorithm = dqnAlgorithm
         self.optimizer = Adam(learningRate: learningRate)
         // Start with a consistent target network; otherwise early TD targets are random/noisy
         // until the first periodic sync.
@@ -31,8 +33,17 @@ final class DQNLearner {
             let qValues = model(states) // [B, actionCount]
             let predictedQ = Self.gatherActionValues(qValues: qValues, actions: actions)
 
-            let nextQValues = targetQNetwork(nextStates)
-            let maxNextQ = nextQValues.max(axis: 1)
+            let maxNextQ: MLXArray
+            switch dqnAlgorithm {
+            case .single:
+                let nextQValues = targetQNetwork(nextStates)
+                maxNextQ = nextQValues.max(axis: 1)
+            case .double:
+                let nextOnlineQValues = model(nextStates)
+                let nextGreedyActions = nextOnlineQValues.argMax(axis: 1)
+                let nextTargetQValues = targetQNetwork(nextStates)
+                maxNextQ = Self.gatherActionValues(qValues: nextTargetQValues, actions: nextGreedyActions)
+            }
             let targetQ = rewards + gamma * notDoneMask * maxNextQ
 
             return [mseLoss(predictions: predictedQ, targets: targetQ, reduction: .mean)]

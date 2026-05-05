@@ -25,7 +25,11 @@ struct DQNTrainer {
             samplingStrategy: config.replaySamplingStrategy,
             seed: config.seed
         )
-        self.learner = DQNLearner(gamma: config.gamma, learningRate: config.learningRate)
+        self.learner = DQNLearner(
+            gamma: config.gamma,
+            learningRate: config.learningRate,
+            dqnAlgorithm: config.dqnAlgorithm
+        )
         self.explorationPolicy = EpsilonGreedyPolicy(
             epsilonStart: config.epsilonStart,
             epsilonEnd: config.epsilonEnd,
@@ -85,6 +89,7 @@ struct DQNTrainer {
                 "max_loss_for_update": "\(config.maxLossForUpdate)",
                 "max_abs_q_value": "\(config.maxAbsQValue)",
                 "max_gradient_l2_norm": "\(config.maxGradientL2Norm)",
+                "dqn_algorithm": config.dqnAlgorithm.rawValue,
             ]
         )
 

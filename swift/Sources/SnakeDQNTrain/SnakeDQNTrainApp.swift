@@ -54,6 +54,10 @@ struct SnakeDQNTrainApp {
             ?? config.bestEpisodeGIFFrameDurationMs
         let mlxDevice = (ProcessInfo.processInfo.environment["SNAKE_MLX_DEVICE"] ?? "cpu").lowercased()
         let trainingSeed = ProcessInfo.processInfo.environment["SNAKE_SEED"].flatMap(Int.init)
+        let dqnAlgorithm = DQNAlgorithm(
+            rawValue: (ProcessInfo.processInfo.environment["SNAKE_DQN_ALGORITHM"] ?? config.dqnAlgorithm.rawValue)
+                .lowercased()
+        ) ?? config.dqnAlgorithm
         let deviceType = mlxDevice == "gpu" ? MLX_GPU : MLX_CPU
         let device = mlx_device_new_type(deviceType, 0)
         mlx_set_default_device(device)
@@ -84,6 +88,7 @@ struct SnakeDQNTrainApp {
         config.bestEpisodeGIFScale = bestEpisodeGIFScale
         config.bestEpisodeGIFFrameDurationMs = bestEpisodeGIFFrameDurationMs
         config.seed = trainingSeed
+        config.dqnAlgorithm = dqnAlgorithm
 
         var trainer = DQNTrainer(
             env: SnakeEnv(usePythonBridge: true, pythonModulePath: pythonDir, seed: trainingSeed),

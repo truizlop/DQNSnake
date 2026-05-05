@@ -93,6 +93,7 @@ Training schedule override env vars:
 - `SNAKE_TRAIN_EVERY`
 - `SNAKE_TARGET_SYNC_EVERY`
 - `SNAKE_BATCH_SIZE`
+- `SNAKE_DQN_ALGORITHM` (`double` default; `single` or `double`)
 - `SNAKE_CHECKPOINT_EVERY_STEPS`
 - `SNAKE_CHECKPOINT_DIR`
 - `SNAKE_RESOURCE_TELEMETRY_EVERY_STEPS` (default `100`, `0` disables in-process resource telemetry)

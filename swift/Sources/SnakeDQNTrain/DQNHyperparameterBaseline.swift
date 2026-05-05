@@ -35,6 +35,7 @@ enum DQNHyperparameterBaseline {
         maxLossForUpdate: 1_000_000,
         maxAbsQValue: 1_000_000,
         maxGradientL2Norm: 1_000_000,
+        dqnAlgorithm: .double,
         epsilonStart: 1.0,
         epsilonEnd: 0.1,
         epsilonDecaySteps: 100_000
