@@ -56,7 +56,7 @@ run-dqn: ## Run DQN trainer
 	@$(SWIFT_ENV) ./scripts/ensure_mlx_metallib.sh; \
 	SNAKE_PYTHON_DIR=python \
 	SNAKE_PYTHON_EXE=/opt/anaconda3/bin/python3 \
-	SNAKE_MLX_DEVICE=cpu \
+	SNAKE_MLX_DEVICE=$${SNAKE_MLX_DEVICE:-cpu} \
 	$(SWIFT_ENV) swift run --package-path $(SWIFT_DIR) snake-dqn-train
 
 open-xcode: ## Open Swift package in Xcode with Apple toolchain-sanitized environment
