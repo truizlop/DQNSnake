@@ -84,10 +84,51 @@ def test_transform_reward_applies_alive_reward_for_non_terminal_step() -> None:
     adapter = object.__new__(SnakeEnvAdapter)
     adapter.normalize_rewards = True
     adapter.alive_reward = 0.001
+    adapter.potential_shaping_enabled = False
 
     assert adapter._transform_reward(raw_reward=0.0, done=False) == pytest.approx(0.001)
     assert adapter._transform_reward(raw_reward=100.0, done=False) == pytest.approx(1.0)
     assert adapter._transform_reward(raw_reward=0.0, done=True) == pytest.approx(-1.0)
+
+
+def test_transform_reward_applies_potential_based_shaping() -> None:
+    adapter = object.__new__(SnakeEnvAdapter)
+    adapter.normalize_rewards = True
+    adapter.alive_reward = 0.0
+    adapter.potential_shaping_enabled = True
+    adapter.potential_shaping_gamma = 0.99
+    adapter.potential_shaping_scale = 0.1
+    adapter.snake_dim = 20
+    adapter.env = object()
+
+    # Move closer: distance 6 -> 5.
+    prev_obs = (5, 5, 8, 8)
+    next_obs = (6, 5, 8, 8)
+    reward_closer = adapter._transform_reward(
+        raw_reward=0.0,
+        done=False,
+        prev_obs=prev_obs,
+        next_obs=next_obs,
+    )
+    assert reward_closer > 0
+
+    # Move farther: distance 5 -> 6.
+    reward_farther = adapter._transform_reward(
+        raw_reward=0.0,
+        done=False,
+        prev_obs=next_obs,
+        next_obs=prev_obs,
+    )
+    assert reward_farther < 0
+
+    # Terminal reward still dominates, with shaping as a small adjustment.
+    terminal = adapter._transform_reward(
+        raw_reward=0.0,
+        done=True,
+        prev_obs=prev_obs,
+        next_obs=next_obs,
+    )
+    assert terminal < -0.9
 
 
 def test_resize_grid_if_needed_maps_to_target_shape() -> None:

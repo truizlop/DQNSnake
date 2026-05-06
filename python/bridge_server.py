@@ -24,6 +24,18 @@ def _env_float(name: str, default: float) -> float:
         raise RuntimeError(f"Invalid float for {name}: {raw}") from exc
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None or raw == "":
+        return default
+    normalized = raw.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise RuntimeError(f"Invalid boolean for {name}: {raw}")
+
+
 def _ok(**payload: Any) -> None:
     payload["ok"] = True
     sys.stdout.write(json.dumps(payload) + "\n")
@@ -57,6 +69,18 @@ def main() -> int:
                 env_name = request.get("env_name", "Snake-v0")
                 seed = request.get("seed")
                 alive_reward = request.get("alive_reward", _env_float("SNAKE_ALIVE_REWARD", 0.0005))
+                potential_shaping_enabled = request.get(
+                    "potential_shaping_enabled",
+                    _env_bool("SNAKE_POTENTIAL_SHAPING_ENABLE", False),
+                )
+                potential_shaping_gamma = request.get(
+                    "potential_shaping_gamma",
+                    _env_float("SNAKE_POTENTIAL_SHAPING_GAMMA", 0.99),
+                )
+                potential_shaping_scale = request.get(
+                    "potential_shaping_scale",
+                    _env_float("SNAKE_POTENTIAL_SHAPING_SCALE", 0.1),
+                )
                 snake_dim = int(request.get("snake_dim", os.getenv("SNAKE_ENV_DIM", "20")))
                 grid_size = int(request.get("grid_size", os.getenv("SNAKE_GRID_SIZE", "84")))
                 with contextlib.redirect_stdout(sys.stderr):
@@ -64,6 +88,9 @@ def main() -> int:
                         env_name=env_name,
                         seed=seed,
                         alive_reward=alive_reward,
+                        potential_shaping_enabled=potential_shaping_enabled,
+                        potential_shaping_gamma=potential_shaping_gamma,
+                        potential_shaping_scale=potential_shaping_scale,
                         snake_dim=snake_dim,
                         grid_size=grid_size,
                     )

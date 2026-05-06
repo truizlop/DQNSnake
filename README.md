@@ -83,6 +83,9 @@ Useful env vars:
 - `SNAKE_RESUME_CHECKPOINT` (path to `.safetensors` checkpoint to resume from)
 - `SNAKE_SEED` (optional int; enables deterministic replay sampling, epsilon exploration RNG, and seeded Python env resets)
 - `SNAKE_ALIVE_REWARD` (default `0.0005`; optional per-step reward for non-terminal, non-apple steps in normalized reward mode)
+- `SNAKE_POTENTIAL_SHAPING_ENABLE` (`0` default; enable potential-based shaping reward)
+- `SNAKE_POTENTIAL_SHAPING_GAMMA` (default `0.99`; shaping discount in `gamma * Phi(s') - Phi(s)`)
+- `SNAKE_POTENTIAL_SHAPING_SCALE` (default `0.1`; multiplier applied to shaping term)
 
 Evaluation env vars:
 - `SNAKE_EVAL_EVERY_EPISODES` (default `0`, disabled)

@@ -43,6 +43,9 @@ class SnakeEnvAdapter:
         normalize_rewards: bool = True,
         binary_observation: bool = True,
         alive_reward: float = 0.0005,
+        potential_shaping_enabled: bool = False,
+        potential_shaping_gamma: float = 0.99,
+        potential_shaping_scale: float = 0.1,
     ):
         if gym is None:
             raise RuntimeError(
@@ -65,6 +68,9 @@ class SnakeEnvAdapter:
         self.normalize_rewards = bool(normalize_rewards)
         self.binary_observation = bool(binary_observation)
         self.alive_reward = float(alive_reward)
+        self.potential_shaping_enabled = bool(potential_shaping_enabled)
+        self.potential_shaping_gamma = float(potential_shaping_gamma)
+        self.potential_shaping_scale = float(potential_shaping_scale)
         self.obs: np.ndarray | None = None
         self.done = False
         self.score = 0.0
@@ -90,7 +96,7 @@ class SnakeEnvAdapter:
         safe_action = self._sanitize_action(action)
         raw = self.env.step(safe_action)
         obs, raw_reward, done = self._extract_step_fields(raw)
-        reward = self._transform_reward(raw_reward, done)
+        reward = self._transform_reward(raw_reward, done, prev_obs=self.obs, next_obs=obs)
 
         self.obs = obs
         self.done = bool(done)
@@ -298,15 +304,66 @@ class SnakeEnvAdapter:
                     unwrapped.new_apple()
                 return
 
-    def _transform_reward(self, raw_reward: float, done: bool) -> float:
+    def _transform_reward(
+        self,
+        raw_reward: float,
+        done: bool,
+        prev_obs: Any | None = None,
+        next_obs: Any | None = None,
+    ) -> float:
         if not self.normalize_rewards:
             return float(raw_reward)
 
         if raw_reward >= 100:
-            return 1.0
-        if done:
-            return -1.0
-        return self.alive_reward
+            base_reward = 1.0
+        elif done:
+            base_reward = -1.0
+        else:
+            base_reward = self.alive_reward
+
+        if not self.potential_shaping_enabled or prev_obs is None or next_obs is None:
+            return base_reward
+
+        prev_potential = self._state_potential(prev_obs)
+        next_potential = self._state_potential(next_obs)
+        shaping = self.potential_shaping_gamma * next_potential - prev_potential
+        return float(base_reward + self.potential_shaping_scale * shaping)
+
+    def _state_potential(self, obs: Any) -> float:
+        head, apple = self._extract_head_and_apple(obs)
+        if head is None or apple is None:
+            return 0.0
+        head_x, head_y = head
+        apple_x, apple_y = apple
+        distance = abs(head_x - apple_x) + abs(head_y - apple_y)
+        max_distance = max(1, 2 * (self.snake_dim - 1))
+        return -float(distance) / float(max_distance)
+
+    def _extract_head_and_apple(
+        self, obs: Any
+    ) -> tuple[tuple[int, int] | None, tuple[int, int] | None]:
+        if isinstance(obs, tuple) and len(obs) == 4:
+            head_x, head_y, apple_x, apple_y = [int(v) for v in obs]
+            return (head_x, head_y), (apple_x, apple_y)
+
+        arr = np.array(obs)
+        if arr.ndim == 2:
+            head_candidates = np.argwhere(arr == 2)
+            apple_candidates = np.argwhere(arr == 3)
+            if len(head_candidates) > 0 and len(apple_candidates) > 0:
+                hx, hy = head_candidates[0]
+                ax, ay = apple_candidates[0]
+                return (int(hx), int(hy)), (int(ax), int(ay))
+
+        unwrapped = getattr(self.env, "unwrapped", None)
+        if unwrapped is None:
+            return None, None
+        if hasattr(unwrapped, "snake") and hasattr(unwrapped, "apple") and unwrapped.snake:
+            head = unwrapped.snake[0]
+            apple = unwrapped.apple
+            return (int(head[0]), int(head[1])), (int(apple[0]), int(apple[1]))
+
+        return None, None
 
     def _obs_to_grid(self, obs: Any) -> np.ndarray:
         # gym-snake v0.1.7 returns a 4-value tuple (head_x, head_y, apple_x, apple_y).

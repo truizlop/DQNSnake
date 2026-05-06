@@ -165,6 +165,17 @@ def test_bridge_server_rejects_invalid_alive_reward_env_var() -> None:
         server.wait(timeout=5)
 
 
+def test_bridge_server_rejects_invalid_potential_shaping_bool_env_var() -> None:
+    server = _start_bridge_server_with_env({"SNAKE_POTENTIAL_SHAPING_ENABLE": "not-a-bool"})
+    try:
+        resp = _send(server, {"cmd": "create_env", "seed": 99})
+        assert resp["ok"] is False
+        assert "SNAKE_POTENTIAL_SHAPING_ENABLE" in resp["error"]
+    finally:
+        server.kill()
+        server.wait(timeout=5)
+
+
 def test_bridge_server_supports_configured_env_dim_and_grid_size() -> None:
     server = _start_bridge_server_with_env({"SNAKE_ENV_DIM": "20", "SNAKE_GRID_SIZE": "84"})
     try:
