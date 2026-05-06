@@ -315,13 +315,11 @@ struct DQNTrainer {
         guard config.replaySamplingStrategy == .prioritized else {
             return 1
         }
-        guard config.prioritizedReplayBetaAnnealSteps > 0 else {
-            return 1
-        }
-        let clamped = min(max(globalStep, 0), config.prioritizedReplayBetaAnnealSteps)
-        let progress = Float(clamped) / Float(config.prioritizedReplayBetaAnnealSteps)
-        let beta = config.prioritizedReplayBetaStart + (1 - config.prioritizedReplayBetaStart) * progress
-        return min(max(beta, 0), 1)
+        return PrioritizedReplayBetaSchedule.beta(
+            globalStep: globalStep,
+            start: config.prioritizedReplayBetaStart,
+            annealSteps: config.prioritizedReplayBetaAnnealSteps
+        )
     }
 
     private func maybeEmitResourceTelemetry(globalStep: Int) {

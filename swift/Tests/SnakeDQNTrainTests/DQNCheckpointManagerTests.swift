@@ -12,8 +12,51 @@ private struct MockCheckpointSaver: DQNModelCheckpointSaving {
     }
 }
 
+private final class CapturingCheckpointSaver: DQNModelCheckpointSaving {
+    var lastMetadata: [String: String] = [:]
+    func saveOnlineModel(to url: URL, metadata: [String: String]) throws {
+        lastMetadata = metadata
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data(metadata.description.utf8).write(to: url)
+    }
+}
+
 private func temporaryDirectoryURL() -> URL {
     FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+}
+
+@Test func checkpointManagerPersistsProvidedMetadataForBestCheckpoint() throws {
+    let directory = temporaryDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    let saver = CapturingCheckpointSaver()
+    var manager = DQNCheckpointManager(
+        checkpointDirectory: directory.path,
+        checkpointEverySteps: 0,
+        saveBestCheckpoint: true
+    )
+
+    let metadata = [
+        "global_step": "12345",
+        "replay_sampling_strategy": "prioritized",
+        "dqn_algorithm": "double",
+    ]
+    _ = try manager.maybeSaveBestCheckpoint(
+        saver: saver,
+        metricValue: 1.2,
+        metricName: "eval_avg_score",
+        metadata: metadata
+    )
+
+    #expect(saver.lastMetadata["global_step"] == "12345")
+    #expect(saver.lastMetadata["replay_sampling_strategy"] == "prioritized")
+    #expect(saver.lastMetadata["dqn_algorithm"] == "double")
+    #expect(saver.lastMetadata["kind"] == "best")
+    #expect(saver.lastMetadata["best_metric_name"] == "eval_avg_score")
+    #expect(saver.lastMetadata["best_metric_value"] == "1.2")
 }
 
 @Test func checkpointManagerSavesPeriodicStepCheckpoints() throws {

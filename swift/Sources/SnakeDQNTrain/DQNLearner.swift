@@ -33,17 +33,11 @@ final class DQNLearner {
             let qValues = model(states) // [B, actionCount]
             let predictedQ = Self.gatherActionValues(qValues: qValues, actions: actions)
 
-            let maxNextQ: MLXArray
-            switch dqnAlgorithm {
-            case .single:
-                let nextQValues = targetQNetwork(nextStates)
-                maxNextQ = nextQValues.max(axis: 1)
-            case .double:
-                let nextOnlineQValues = model(nextStates)
-                let nextGreedyActions = nextOnlineQValues.argMax(axis: 1)
-                let nextTargetQValues = targetQNetwork(nextStates)
-                maxNextQ = Self.gatherActionValues(qValues: nextTargetQValues, actions: nextGreedyActions)
-            }
+            let maxNextQ = Self.bootstrapNextQ(
+                onlineNextQValues: model(nextStates),
+                targetNextQValues: targetQNetwork(nextStates),
+                algorithm: dqnAlgorithm
+            )
             let targetQ = rewards + gamma * notDoneMask * maxNextQ
             let tdError = predictedQ - targetQ
             let weightedSquaredError = arrays[5] * tdError.square()
@@ -92,11 +86,25 @@ final class DQNLearner {
     //
     // This yields the exact scalar target we regress in DQN for each transition, while
     // keeping the operation fully vectorized across the minibatch.
-    private static func gatherActionValues(qValues: MLXArray, actions: MLXArray) -> MLXArray {
+    static func gatherActionValues(qValues: MLXArray, actions: MLXArray) -> MLXArray {
         let actionSpace = qValues.shape[1]
         let actionRange = MLXArray(0 ..< actionSpace).reshaped(1, actionSpace)
         let actionMask = (actionRange .== actions.reshaped(-1, 1)).asType(qValues.dtype)
         return (qValues * actionMask).sum(axis: 1)
+    }
+
+    static func bootstrapNextQ(
+        onlineNextQValues: MLXArray,
+        targetNextQValues: MLXArray,
+        algorithm: DQNAlgorithm
+    ) -> MLXArray {
+        switch algorithm {
+        case .single:
+            return targetNextQValues.max(axis: 1)
+        case .double:
+            let nextGreedyActions = onlineNextQValues.argMax(axis: 1)
+            return gatherActionValues(qValues: targetNextQValues, actions: nextGreedyActions)
+        }
     }
 
     func trainStep(batch: DQNBatch) -> DQNTrainStepMetrics {
@@ -132,17 +140,11 @@ final class DQNLearner {
         let qValues = onlineQNetwork(batch.states)
         let predictedQ = Self.gatherActionValues(qValues: qValues, actions: batch.actions)
 
-        let nextValue: MLXArray
-        switch dqnAlgorithm {
-        case .single:
-            let nextQValues = targetQNetwork(batch.nextStates)
-            nextValue = nextQValues.max(axis: 1)
-        case .double:
-            let nextOnlineQValues = onlineQNetwork(batch.nextStates)
-            let nextGreedyActions = nextOnlineQValues.argMax(axis: 1)
-            let nextTargetQValues = targetQNetwork(batch.nextStates)
-            nextValue = Self.gatherActionValues(qValues: nextTargetQValues, actions: nextGreedyActions)
-        }
+        let nextValue = Self.bootstrapNextQ(
+            onlineNextQValues: onlineQNetwork(batch.nextStates),
+            targetNextQValues: targetQNetwork(batch.nextStates),
+            algorithm: dqnAlgorithm
+        )
 
         let targetQ = batch.rewards + gamma * batch.notDoneMask * nextValue
         let absTdError = (predictedQ - targetQ).abs().asType(.float32)

@@ -98,6 +98,49 @@ import Testing
     }
 }
 
+@Test func prioritizedReplayNewlyOverwrittenTransitionGetsMaxPriority() {
+    var buffer = ReplayBuffer(
+        capacity: 3,
+        samplingStrategy: .prioritized,
+        prioritizedAlpha: 0.6,
+        prioritizedEpsilon: 1e-3,
+        seed: 999
+    )
+    buffer.append(makeTransition(id: 0))
+    buffer.append(makeTransition(id: 1))
+    buffer.append(makeTransition(id: 2))
+
+    buffer.updatePriorities(indices: [0, 1, 2], tdErrors: [0.01, 0.01, 100])
+    buffer.append(makeTransition(id: 99)) // overwrites index 0, should inherit max priority.
+
+    var replacementHits = 0
+    for _ in 0..<1500 {
+        let sample = buffer.sample(batchSize: 1, importanceSamplingBeta: 1)
+        if sample.indices[0] == 0 {
+            replacementHits += 1
+        }
+    }
+    #expect(Float(replacementHits) / 1500 > 0.45)
+}
+
+@Test func prioritizedReplayWithEqualPrioritiesProducesFiniteUnitWeights() {
+    var buffer = ReplayBuffer(
+        capacity: 4,
+        samplingStrategy: .prioritized,
+        prioritizedAlpha: 0.6,
+        prioritizedEpsilon: 1e-3,
+        seed: 12
+    )
+    for i in 0..<4 {
+        buffer.append(makeTransition(id: i))
+    }
+    buffer.updatePriorities(indices: [0, 1, 2, 3], tdErrors: [1, 1, 1, 1])
+
+    let sample = buffer.sample(batchSize: 4, importanceSamplingBeta: 1)
+    #expect(sample.importanceWeights.allSatisfy { $0.isFinite })
+    #expect(sample.importanceWeights.allSatisfy { abs($0 - 1) < 1e-5 })
+}
+
 private func makeTransition(id: Int) -> DQNTransition {
     DQNTransition(
         state: MLXArray([Float(id)]).reshaped(1, 1),
