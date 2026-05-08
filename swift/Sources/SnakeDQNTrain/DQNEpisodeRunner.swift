@@ -69,8 +69,6 @@ struct DQNEpisodeRunner {
     }
 
     private func stateTensor(from stackedFrames: [UInt8], width: Int, height: Int) -> MLXArray {
-        let values = stackedFrames.map { Float($0) }
-        let array = MLXArray(values)
-        return array.reshaped(1, height, width, 4)
+        StateTensorLayout.stateTensor(from: stackedFrames, width: width, height: height)
     }
 }
