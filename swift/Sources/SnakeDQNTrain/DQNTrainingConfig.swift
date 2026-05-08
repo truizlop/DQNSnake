@@ -8,7 +8,7 @@ struct DQNTrainingConfig {
     var replaySamplingStrategy: ReplaySamplingStrategy = .withReplacement
     var prioritizedReplayAlpha: Float = 0.6
     var prioritizedReplayBetaStart: Float = 0.4
-    var prioritizedReplayBetaAnnealSteps: Int = 1_000_000
+    var prioritizedReplayBetaAnnealSteps: Int = 200_000
     var prioritizedReplayEpsilon: Float = 1e-3
     var checkpointDirectory: String = "checkpoints"
     var checkpointEverySteps: Int = 10_000
@@ -46,5 +46,5 @@ struct DQNTrainingConfig {
     // Epsilon-greedy schedule
     var epsilonStart: Float = 1.0
     var epsilonEnd: Float = 0.1
-    var epsilonDecaySteps: Int = 1_000_000
+    var epsilonDecaySteps: Int = 100_000
 }

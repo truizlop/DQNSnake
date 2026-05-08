@@ -67,6 +67,27 @@ def test_grid_contains_typed_entities() -> None:
     assert (grid == 3).any()
 
 
+def test_tuple_observation_path_honors_binary_observation() -> None:
+    class _Unwrapped:
+        dim = 6
+        snake = [[2, 3], [2, 2], [2, 1]]
+        apple = [4, 5]
+
+    class _Env:
+        unwrapped = _Unwrapped()
+
+    adapter = object.__new__(SnakeEnvAdapter)
+    adapter.env = _Env()
+    adapter.grid_size = 6
+    adapter.binary_observation = True
+
+    grid = adapter._obs_to_grid((2, 3, 4, 5))
+
+    assert grid.shape == (6, 6)
+    assert set(np.unique(grid).tolist()).issubset({0, 1})
+    assert (grid == 1).any()
+
+
 def test_frame_stack_shape() -> None:
     stack = FrameStack(k=4)
     obs = np.zeros((16, 16), dtype=np.uint8)

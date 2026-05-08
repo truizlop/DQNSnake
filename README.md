@@ -94,12 +94,15 @@ Evaluation env vars:
 Training schedule override env vars:
 - `SNAKE_WARMUP_STEPS`
 - `SNAKE_TRAIN_EVERY`
+- `SNAKE_EPSILON_START` (default `1.0`)
+- `SNAKE_EPSILON_END` (default `0.1`)
+- `SNAKE_EPSILON_DECAY_STEPS` (default `100000`)
 - `SNAKE_TARGET_SYNC_EVERY`
 - `SNAKE_BATCH_SIZE`
 - `SNAKE_REPLAY_SAMPLING_STRATEGY` (`with_replacement` default; `without_replacement` or `prioritized`)
 - `SNAKE_PER_ALPHA` (default `0.6`; prioritization exponent)
 - `SNAKE_PER_BETA_START` (default `0.4`; initial importance-sampling correction)
-- `SNAKE_PER_BETA_ANNEAL_STEPS` (default `1000000`; anneal beta to `1.0`)
+- `SNAKE_PER_BETA_ANNEAL_STEPS` (default `200000`; anneal beta to `1.0`)
 - `SNAKE_PER_EPSILON` (default `0.001`; small constant added to TD error before prioritization)
 - `SNAKE_DQN_ALGORITHM` (`double` default; `single` or `double`)
 - `SNAKE_CHECKPOINT_EVERY_STEPS`

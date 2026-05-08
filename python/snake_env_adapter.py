@@ -385,6 +385,8 @@ class SnakeEnvAdapter:
                     if 0 <= ax < dim and 0 <= ay < dim:
                         # 3=apple
                         grid[ax, ay] = 3
+                if self.binary_observation:
+                    grid = (grid > 0).astype(np.uint8)
                 return self._resize_grid_if_needed(grid)
 
         arr = self._process_obs(obs)
