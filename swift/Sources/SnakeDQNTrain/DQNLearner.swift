@@ -36,11 +36,11 @@ final class DQNLearner {
             let predictedQ = Self.gatherActionValues(qValues: qValues, actions: actions)
 
             let maxNextQ = Self.bootstrapNextQ(
-                onlineNextQValues: model(nextStates),
-                targetNextQValues: targetQNetwork(nextStates),
+                onlineNextQValues: stopGradient(model(nextStates)),
+                targetNextQValues: stopGradient(targetQNetwork(nextStates)),
                 algorithm: dqnAlgorithm
             )
-            let targetQ = rewards + gamma * notDoneMask * maxNextQ
+            let targetQ = stopGradient(rewards + gamma * notDoneMask * maxNextQ)
             let tdError = predictedQ - targetQ
             let weightedSquaredError = arrays[5] * tdError.square()
             let loss = weightedSquaredError.mean()
