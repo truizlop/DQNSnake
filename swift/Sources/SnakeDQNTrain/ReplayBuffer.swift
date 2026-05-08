@@ -80,6 +80,9 @@ struct ReplayBuffer {
                 maxPriority = priority
             }
         }
+        // Keep insertion priority calibrated to current buffer contents; otherwise maxPriority
+        // can stay stale-high forever and over-prioritize newly inserted transitions.
+        maxPriority = priorities.prefix(count).max() ?? 1
     }
 
     private mutating func sampleWithReplacement(batchSize: Int) -> ReplaySample {

@@ -123,6 +123,36 @@ import Testing
     #expect(Float(replacementHits) / 1500 > 0.45)
 }
 
+@Test func prioritizedReplayMaxPriorityTracksCurrentBufferNotHistoricalPeak() {
+    var buffer = ReplayBuffer(
+        capacity: 4,
+        samplingStrategy: .prioritized,
+        prioritizedAlpha: 0.6,
+        prioritizedEpsilon: 1e-3,
+        seed: 2026
+    )
+    for i in 0..<4 {
+        buffer.append(makeTransition(id: i))
+    }
+
+    // Historical spike.
+    buffer.updatePriorities(indices: [0], tdErrors: [100])
+    // Later all priorities become small; maxPriority should drop accordingly.
+    buffer.updatePriorities(indices: [0, 1, 2, 3], tdErrors: [0.1, 0.1, 0.1, 0.1])
+    // New transition should not inherit stale huge priority.
+    buffer.append(makeTransition(id: 99))
+
+    var counts = [0, 0, 0, 0]
+    for _ in 0..<2000 {
+        let sample = buffer.sample(batchSize: 1, importanceSamplingBeta: 1)
+        counts[sample.indices[0]] += 1
+    }
+
+    // In near-uniform priorities, no single index should dominate.
+    let maxRate = Float(counts.max() ?? 0) / 2000
+    #expect(maxRate < 0.45)
+}
+
 @Test func prioritizedReplayWithEqualPrioritiesProducesFiniteUnitWeights() {
     var buffer = ReplayBuffer(
         capacity: 4,
