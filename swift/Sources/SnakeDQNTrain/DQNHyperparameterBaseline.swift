@@ -36,6 +36,7 @@ enum DQNHyperparameterBaseline {
         gamma: 0.99,
         learningRate: 2.5e-4,
         maxConsecutiveSkippedUpdates: 500,
+        gradientClipNorm: 10,
         maxLossForUpdate: 1_000_000,
         maxAbsQValue: 1_000_000,
         maxGradientL2Norm: 1_000_000,

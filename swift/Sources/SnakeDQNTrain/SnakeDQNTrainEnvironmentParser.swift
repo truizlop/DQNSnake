@@ -27,6 +27,7 @@ enum SnakeDQNTrainEnvironmentParser {
         config.evalEpisodes = Int(env["SNAKE_EVAL_EPISODES"] ?? "") ?? config.evalEpisodes
         config.warmupSteps = Int(env["SNAKE_WARMUP_STEPS"] ?? "") ?? config.warmupSteps
         config.trainEvery = Int(env["SNAKE_TRAIN_EVERY"] ?? "") ?? config.trainEvery
+        config.gradientClipNorm = Float(env["SNAKE_GRAD_CLIP_NORM"] ?? "") ?? config.gradientClipNorm
         config.epsilonStart = Float(env["SNAKE_EPSILON_START"] ?? "") ?? config.epsilonStart
         config.epsilonEnd = Float(env["SNAKE_EPSILON_END"] ?? "") ?? config.epsilonEnd
         config.epsilonDecaySteps = Int(env["SNAKE_EPSILON_DECAY_STEPS"] ?? "") ?? config.epsilonDecaySteps

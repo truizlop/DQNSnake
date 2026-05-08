@@ -12,13 +12,15 @@ final class DQNLearner {
     // gamma near 0 emphasizes immediate rewards; gamma near 1 values long-term return.
     private let gamma: Float
     private let dqnAlgorithm: DQNAlgorithm
+    private let gradientClipNorm: Float
     private let lossAndGrad: (DQNModel, [MLXArray]) -> ([MLXArray], ModuleParameters)
 
-    init(gamma: Float, learningRate: Float, dqnAlgorithm: DQNAlgorithm) {
+    init(gamma: Float, learningRate: Float, dqnAlgorithm: DQNAlgorithm, gradientClipNorm: Float) {
         self.onlineQNetwork = DQNModel()
         self.targetQNetwork = DQNModel()
         self.gamma = gamma
         self.dqnAlgorithm = dqnAlgorithm
+        self.gradientClipNorm = gradientClipNorm
         self.optimizer = Adam(learningRate: learningRate)
         // Start with a consistent target network; otherwise early TD targets are random/noisy
         // until the first periodic sync.
@@ -123,8 +125,13 @@ final class DQNLearner {
         let gradientL2Norm = Self.l2Norm(parameters: gradients)
 
         let shouldSkipUpdate = !lossFinite || !gradientsFinite || !gradientL2Norm.isFinite
+        let clippedGradients = Self.clipGradients(
+            gradients,
+            gradientL2Norm: gradientL2Norm,
+            maxNorm: gradientClipNorm
+        )
         if !shouldSkipUpdate {
-            optimizer.update(model: onlineQNetwork, gradients: gradients)
+            optimizer.update(model: onlineQNetwork, gradients: clippedGradients)
         }
 
         return DQNTrainStepMetrics(
@@ -166,6 +173,28 @@ final class DQNLearner {
             squaredNorm += value.square().sum().item(Float.self)
         }
         return Foundation.sqrt(squaredNorm)
+    }
+
+    static func gradientClipScale(gradientL2Norm: Float, maxNorm: Float) -> Float {
+        guard maxNorm > 0, gradientL2Norm.isFinite, gradientL2Norm > maxNorm else {
+            return 1
+        }
+        return maxNorm / gradientL2Norm
+    }
+
+    static func clipGradients(
+        _ gradients: ModuleParameters,
+        gradientL2Norm: Float,
+        maxNorm: Float
+    ) -> ModuleParameters {
+        let scale = gradientClipScale(gradientL2Norm: gradientL2Norm, maxNorm: maxNorm)
+        guard scale < 1 else {
+            return gradients
+        }
+        let scaled = Dictionary(uniqueKeysWithValues: gradients.flattened().map { key, value in
+            (key, value * scale)
+        })
+        return ModuleParameters.unflattened(scaled)
     }
 }
 

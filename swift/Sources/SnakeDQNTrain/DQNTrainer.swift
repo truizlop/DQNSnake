@@ -30,7 +30,8 @@ struct DQNTrainer {
         self.learner = DQNLearner(
             gamma: config.gamma,
             learningRate: config.learningRate,
-            dqnAlgorithm: config.dqnAlgorithm
+            dqnAlgorithm: config.dqnAlgorithm,
+            gradientClipNorm: config.gradientClipNorm
         )
         self.explorationPolicy = EpsilonGreedyPolicy(
             epsilonStart: config.epsilonStart,
@@ -92,6 +93,7 @@ struct DQNTrainer {
                 "train_every": "\(config.trainEvery)",
                 "batch_size": "\(config.batchSize)",
                 "max_consecutive_skipped_updates": "\(config.maxConsecutiveSkippedUpdates)",
+                "gradient_clip_norm": "\(config.gradientClipNorm)",
                 "max_loss_for_update": "\(config.maxLossForUpdate)",
                 "max_abs_q_value": "\(config.maxAbsQValue)",
                 "max_gradient_l2_norm": "\(config.maxGradientL2Norm)",

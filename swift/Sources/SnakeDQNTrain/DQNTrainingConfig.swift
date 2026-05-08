@@ -37,6 +37,7 @@ struct DQNTrainingConfig {
     var gamma: Float = 0.99
     var learningRate: Float = 2.5e-4
     var maxConsecutiveSkippedUpdates: Int = 500
+    var gradientClipNorm: Float = 10
     var maxLossForUpdate: Float = 1_000_000
     var maxAbsQValue: Float = 1_000_000
     var maxGradientL2Norm: Float = 1_000_000
