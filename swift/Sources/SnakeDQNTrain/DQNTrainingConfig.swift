@@ -16,6 +16,8 @@ struct DQNTrainingConfig {
     var resumeCheckpointPath: String? = nil
     var evalEveryEpisodes: Int = 0
     var evalEpisodes: Int = 5
+    var evalFixedSeeds: [Int]? = nil
+    var evalRollingWindow: Int = 20
     var enableTensorBoard: Bool = true
     var launchTensorBoard: Bool = true
     var tensorBoardLogDir: String = "runs/snake_dqn"

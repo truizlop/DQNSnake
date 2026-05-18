@@ -22,6 +22,7 @@ final class PythonSnakeBridge: SnakeBridgeClient, @unchecked Sendable {
 
     private struct ResetRequest: Encodable {
         let cmd: String = "reset"
+        let seed: Int?
     }
 
     private struct ResetResponse: Decodable {
@@ -152,8 +153,8 @@ final class PythonSnakeBridge: SnakeBridgeClient, @unchecked Sendable {
         }
     }
 
-    func reset() throws -> [[UInt8]] {
-        let response = try send(ResetRequest(), as: ResetResponse.self)
+    func reset(seed: Int?) throws -> [[UInt8]] {
+        let response = try send(ResetRequest(seed: seed), as: ResetResponse.self)
         return response.frame
     }
 

@@ -16,6 +16,8 @@ struct DQNTrainer {
     var structuredLogger: DQNStructuredLogger?
     var stabilityTracker: DQNStabilityTracker
     var bestTrainingEpisodeScore: Float?
+    var recentEvalScores: [Float]
+    var recentEvalApples: [Float]
 
     init(env: SnakeEnv, config: DQNTrainingConfig = DQNTrainingConfig()) {
         self.env = env
@@ -57,6 +59,8 @@ struct DQNTrainer {
         self.structuredLogger = nil
         self.stabilityTracker = DQNStabilityTracker()
         self.bestTrainingEpisodeScore = nil
+        self.recentEvalScores = []
+        self.recentEvalApples = []
     }
 
     mutating func run() async throws {
@@ -170,12 +174,17 @@ struct DQNTrainer {
             if shouldEvaluate(episode: episode) {
                 let evaluation = try await evaluator.evaluate(
                     episodes: config.evalEpisodes,
+                    fixedSeeds: config.evalFixedSeeds,
                     selectAction: { state in
                         learner.greedyAction(for: state)
                     }
                 )
+                let rolling = appendAndSummarizeEvaluation(
+                    score: evaluation.averageScore,
+                    apples: evaluation.averageApples
+                )
                 print(
-                    "eval episode=\(episode) episodes=\(evaluation.episodes) avgReward=\(evaluation.averageReward) avgScore=\(evaluation.averageScore) avgApples=\(evaluation.averageApples)"
+                    "eval episode=\(episode) episodes=\(evaluation.episodes) avgReward=\(evaluation.averageReward) avgScore=\(evaluation.averageScore) avgApples=\(evaluation.averageApples) rollingAvgScore=\(rolling.avgScore) rollingStdScore=\(rolling.stdScore)"
                 )
                 structuredLogger?.log(
                     event: "evaluation",
@@ -186,6 +195,11 @@ struct DQNTrainer {
                         "eval_avg_reward": "\(evaluation.averageReward)",
                         "eval_avg_score": "\(evaluation.averageScore)",
                         "eval_avg_apples": "\(evaluation.averageApples)",
+                        "eval_rolling_window": "\(rolling.window)",
+                        "eval_rolling_avg_score": "\(rolling.avgScore)",
+                        "eval_rolling_std_score": "\(rolling.stdScore)",
+                        "eval_rolling_avg_apples": "\(rolling.avgApples)",
+                        "eval_rolling_std_apples": "\(rolling.stdApples)",
                     ]
                 )
                 let savedBest = try checkpointManager.maybeSaveBestCheckpoint(
@@ -199,6 +213,11 @@ struct DQNTrainer {
                         "eval_avg_reward": "\(evaluation.averageReward)",
                         "eval_avg_score": "\(evaluation.averageScore)",
                         "eval_avg_apples": "\(evaluation.averageApples)",
+                        "eval_rolling_window": "\(rolling.window)",
+                        "eval_rolling_avg_score": "\(rolling.avgScore)",
+                        "eval_rolling_std_score": "\(rolling.stdScore)",
+                        "eval_rolling_avg_apples": "\(rolling.avgApples)",
+                        "eval_rolling_std_apples": "\(rolling.stdApples)",
                     ]
                 )
                 if savedBest {
@@ -218,10 +237,47 @@ struct DQNTrainer {
                         "eval/avg_reward": evaluation.averageReward,
                         "eval/avg_score": evaluation.averageScore,
                         "eval/avg_apples": evaluation.averageApples,
+                        "eval/rolling_avg_score": rolling.avgScore,
+                        "eval/rolling_std_score": rolling.stdScore,
+                        "eval/rolling_avg_apples": rolling.avgApples,
+                        "eval/rolling_std_apples": rolling.stdApples,
                     ]
                 )
             }
         }
+    }
+
+    private mutating func appendAndSummarizeEvaluation(score: Float, apples: Float) -> (
+        window: Int,
+        avgScore: Float,
+        stdScore: Float,
+        avgApples: Float,
+        stdApples: Float
+    ) {
+        recentEvalScores.append(score)
+        recentEvalApples.append(apples)
+        let window = max(1, config.evalRollingWindow)
+        if recentEvalScores.count > window {
+            recentEvalScores.removeFirst(recentEvalScores.count - window)
+        }
+        if recentEvalApples.count > window {
+            recentEvalApples.removeFirst(recentEvalApples.count - window)
+        }
+
+        let avgScore = recentEvalScores.reduce(0, +) / Float(recentEvalScores.count)
+        let avgApples = recentEvalApples.reduce(0, +) / Float(recentEvalApples.count)
+        let stdScore = stddev(values: recentEvalScores, mean: avgScore)
+        let stdApples = stddev(values: recentEvalApples, mean: avgApples)
+        return (recentEvalScores.count, avgScore, stdScore, avgApples, stdApples)
+    }
+
+    private func stddev(values: [Float], mean: Float) -> Float {
+        guard values.count > 1 else { return 0 }
+        let variance = values.reduce(0) { partial, value in
+            let d = value - mean
+            return partial + d * d
+        } / Float(values.count)
+        return sqrt(variance)
     }
 
     private func shouldOptimize(globalStep: Int) -> Bool {

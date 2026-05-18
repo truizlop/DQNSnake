@@ -71,37 +71,51 @@ class SnakeEnvAdapter:
         self.potential_shaping_enabled = bool(potential_shaping_enabled)
         self.potential_shaping_gamma = float(potential_shaping_gamma)
         self.potential_shaping_scale = float(potential_shaping_scale)
+        # gym-snake v0.1.7 hardcodes `done=True` at step 200.
+        # Treat that as a legacy time-limit truncation, not terminal failure.
+        self.ignore_legacy_step_limit_termination = True
+        self.legacy_step_limit = 200
         self.obs: np.ndarray | None = None
         self.done = False
         self.score = 0.0
         self._current_episode_frames: list[np.ndarray] = []
         self._last_episode_frames: list[np.ndarray] = []
+        self._current_episode_render_frames: list[np.ndarray] = []
+        self._last_episode_render_frames: list[np.ndarray] = []
         self._reset_count = 0
         self._seed_env_rngs()
 
-    def reset(self) -> np.ndarray:
+    def reset(self, seed: int | None = None) -> np.ndarray:
         if self._current_episode_frames:
             self._last_episode_frames = [frame.copy() for frame in self._current_episode_frames]
-        reset_seed = self._next_reset_seed()
+        if self._current_episode_render_frames:
+            self._last_episode_render_frames = [
+                frame.copy() for frame in self._current_episode_render_frames
+            ]
+        reset_seed = seed if seed is not None else self._next_reset_seed()
         raw = self._reset_with_seed(reset_seed)
         self.obs = self._extract_obs_from_reset(raw)
         self._enforce_initial_length()
         self.done = False
         self.score = 0.0
+        render_grid = self._obs_to_grid(self.obs, force_typed=True)
         grid = self._obs_to_grid(self.obs)
         self._current_episode_frames = [grid.copy()]
+        self._current_episode_render_frames = [render_grid.copy()]
         return grid
 
     def step(self, action: int) -> tuple[np.ndarray, float, bool, float]:
         safe_action = self._sanitize_action(action)
         raw = self.env.step(safe_action)
         obs, raw_reward, done = self._extract_step_fields(raw)
+        done = self._resolve_done(raw_done=done, raw_reward=raw_reward)
         reward = self._transform_reward(raw_reward, done, prev_obs=self.obs, next_obs=obs)
 
         self.obs = obs
         self.done = bool(done)
         self.score += float(reward)
 
+        render_grid = self._obs_to_grid(obs, force_typed=True)
         output = StepOutput(
             observation=self._obs_to_grid(obs),
             reward=float(reward),
@@ -109,14 +123,45 @@ class SnakeEnvAdapter:
             score=float(self.score),
         )
         self._current_episode_frames.append(output.observation.copy())
+        self._current_episode_render_frames.append(render_grid.copy())
         if self.done:
             self._last_episode_frames = [frame.copy() for frame in self._current_episode_frames]
+            self._last_episode_render_frames = [
+                frame.copy() for frame in self._current_episode_render_frames
+            ]
         return output.observation, output.reward, output.done, output.score
+
+    def _resolve_done(self, raw_done: bool, raw_reward: float) -> bool:
+        done = bool(raw_done)
+        if not done:
+            return False
+        if self._is_legacy_step_limit_termination(raw_reward):
+            return False
+        return True
+
+    def _is_legacy_step_limit_termination(self, raw_reward: float) -> bool:
+        if not self.ignore_legacy_step_limit_termination:
+            return False
+        # Keep invalid-move terminals intact.
+        if float(raw_reward) <= -100.0:
+            return False
+        unwrapped = getattr(self.env, "unwrapped", None)
+        if unwrapped is None or not hasattr(unwrapped, "steps"):
+            return False
+        try:
+            steps = int(unwrapped.steps)
+        except Exception:
+            return False
+        return steps == int(self.legacy_step_limit)
 
     def save_last_episode_gif(
         self, path: str, scale: int = 8, frame_duration_ms: int = 80
     ) -> int:
-        frames = self._last_episode_frames or self._current_episode_frames
+        last_render_frames = getattr(self, "_last_episode_render_frames", [])
+        current_render_frames = getattr(self, "_current_episode_render_frames", [])
+        frames = last_render_frames or current_render_frames
+        if not frames:
+            frames = self._last_episode_frames or self._current_episode_frames
         if not frames:
             raise RuntimeError("No episode frames available to export.")
 
@@ -365,7 +410,7 @@ class SnakeEnvAdapter:
 
         return None, None
 
-    def _obs_to_grid(self, obs: Any) -> np.ndarray:
+    def _obs_to_grid(self, obs: Any, force_typed: bool = False) -> np.ndarray:
         # gym-snake v0.1.7 returns a 4-value tuple (head_x, head_y, apple_x, apple_y).
         # Build the tile grid from environment state so downstream code gets image-like obs.
         if isinstance(obs, tuple) and len(obs) == 4 and hasattr(self.env, "unwrapped"):
@@ -385,12 +430,12 @@ class SnakeEnvAdapter:
                     if 0 <= ax < dim and 0 <= ay < dim:
                         # 3=apple
                         grid[ax, ay] = 3
-                if self.binary_observation:
+                if self.binary_observation and not force_typed:
                     grid = (grid > 0).astype(np.uint8)
                 return self._resize_grid_if_needed(grid)
 
         arr = self._process_obs(obs)
-        if self.binary_observation:
+        if self.binary_observation and not force_typed:
             arr = (arr > 0).astype(np.uint8)
         return self._resize_grid_if_needed(arr)
 

@@ -4,7 +4,7 @@ import Testing
 struct MockBridge: SnakeBridgeClient {
     let frame: [[UInt8]]
 
-    func reset() throws -> [[UInt8]] {
+    func reset(seed _: Int?) throws -> [[UInt8]] {
         frame
     }
 

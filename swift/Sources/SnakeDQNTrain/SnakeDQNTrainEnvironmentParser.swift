@@ -25,6 +25,8 @@ enum SnakeDQNTrainEnvironmentParser {
         config.tensorBoardPort = Int(env["SNAKE_TB_PORT"] ?? "") ?? config.tensorBoardPort
         config.evalEveryEpisodes = Int(env["SNAKE_EVAL_EVERY_EPISODES"] ?? "") ?? config.evalEveryEpisodes
         config.evalEpisodes = Int(env["SNAKE_EVAL_EPISODES"] ?? "") ?? config.evalEpisodes
+        config.evalRollingWindow = Int(env["SNAKE_EVAL_ROLLING_WINDOW"] ?? "") ?? config.evalRollingWindow
+        config.evalFixedSeeds = parseIntList(env["SNAKE_EVAL_SEEDS"])
         config.warmupSteps = Int(env["SNAKE_WARMUP_STEPS"] ?? "") ?? config.warmupSteps
         config.trainEvery = Int(env["SNAKE_TRAIN_EVERY"] ?? "") ?? config.trainEvery
         config.gradientClipNorm = Float(env["SNAKE_GRAD_CLIP_NORM"] ?? "") ?? config.gradientClipNorm
@@ -50,5 +52,13 @@ enum SnakeDQNTrainEnvironmentParser {
             rawValue: (env["SNAKE_DQN_ALGORITHM"] ?? config.dqnAlgorithm.rawValue).lowercased()
         ) ?? config.dqnAlgorithm
         return config
+    }
+
+    private static func parseIntList(_ raw: String?) -> [Int]? {
+        guard let raw, !raw.isEmpty else { return nil }
+        let values = raw
+            .split(separator: ",")
+            .compactMap { Int($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
+        return values.isEmpty ? nil : values
     }
 }

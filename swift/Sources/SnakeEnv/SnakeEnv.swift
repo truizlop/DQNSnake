@@ -1,7 +1,7 @@
 import Foundation
 
 protocol SnakeBridgeClient: Sendable {
-    func reset() throws -> [[UInt8]]
+    func reset(seed: Int?) throws -> [[UInt8]]
     func step(action: Int) throws -> (observation: [[UInt8]], reward: Float, done: Bool, score: Float)
     func score() -> Float
     func isDone() -> Bool
@@ -25,8 +25,8 @@ public actor SnakeEnv {
         self.bridge = bridge
     }
 
-    public func reset() async throws -> Frame {
-        let grid = try bridge.reset()
+    public func reset(seed: Int? = nil) async throws -> Frame {
+        let grid = try bridge.reset(seed: seed)
         return try flatten(grid: grid)
     }
 

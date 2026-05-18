@@ -1,7 +1,7 @@
 import Foundation
 
 struct UnavailableSnakeBridge: SnakeBridgeClient {
-    func reset() throws -> [[UInt8]] {
+    func reset(seed _: Int?) throws -> [[UInt8]] {
         throw SnakeEnvError.bridgeUnavailable
     }
 

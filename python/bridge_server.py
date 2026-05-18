@@ -98,8 +98,9 @@ def main() -> int:
                 continue
 
             if cmd == "reset":
+                seed = request.get("seed")
                 with contextlib.redirect_stdout(sys.stderr):
-                    frame = _require_env().reset().tolist()
+                    frame = _require_env().reset(seed=seed).tolist()
                 _ok(frame=frame)
                 continue
 

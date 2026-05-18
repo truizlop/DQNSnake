@@ -7,6 +7,7 @@ import tempfile
 
 import numpy as np
 import pytest
+from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(__file__))
 PYTHON_DIR = os.path.join(ROOT, "python")
@@ -187,3 +188,97 @@ def test_save_last_episode_gif_writes_file() -> None:
         frame_count = adapter.save_last_episode_gif(path=path, scale=2, frame_duration_ms=40)
         assert frame_count == 2
         assert os.path.exists(path)
+
+
+def test_save_last_episode_gif_prefers_typed_render_frames() -> None:
+    adapter = object.__new__(SnakeEnvAdapter)
+    binary = np.zeros((8, 8), dtype=np.uint8)
+    binary[2, 3] = 1
+    binary[5, 6] = 1
+    typed = np.zeros((8, 8), dtype=np.uint8)
+    typed[2, 3] = 2
+    typed[5, 6] = 3
+    adapter._current_episode_frames = [binary.copy()]
+    adapter._last_episode_frames = []
+    adapter._current_episode_render_frames = [typed.copy()]
+    adapter._last_episode_render_frames = []
+
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "episode_typed.gif")
+        adapter.save_last_episode_gif(path=path, scale=1, frame_duration_ms=40)
+        img = Image.open(path).convert("RGB")
+        arr = np.array(img, dtype=np.uint8)
+        # Typed apple color must remain red in GIF output.
+        assert (arr[:, :, 0] == 220).any()
+        assert (arr[:, :, 1] == 40).any()
+        assert (arr[:, :, 2] == 40).any()
+
+
+def test_step_ignores_legacy_200_step_done() -> None:
+    class _Unwrapped:
+        steps = 200
+
+    class _Env:
+        unwrapped = _Unwrapped()
+
+        @staticmethod
+        def step(_action: int):
+            # Legacy gym-snake timeout-style done at step 200.
+            return (1, 1, 2, 2), -1.0, True, {}
+
+    adapter = object.__new__(SnakeEnvAdapter)
+    adapter.env = _Env()
+    adapter.obs = (1, 1, 2, 2)
+    adapter.done = False
+    adapter.score = 0.0
+    adapter.normalize_rewards = True
+    adapter.alive_reward = 0.001
+    adapter.potential_shaping_enabled = False
+    adapter.ignore_legacy_step_limit_termination = True
+    adapter.legacy_step_limit = 200
+    adapter._current_episode_frames = []
+    adapter._last_episode_frames = []
+    adapter._current_episode_render_frames = []
+    adapter._last_episode_render_frames = []
+    adapter._sanitize_action = lambda a: a
+    adapter._obs_to_grid = lambda _obs, force_typed=False: np.zeros((4, 4), dtype=np.uint8)
+
+    _obs, reward, done, _score = adapter.step(0)
+
+    assert done is False
+    assert reward == pytest.approx(0.001)
+
+
+def test_step_keeps_collision_done_even_at_step_200() -> None:
+    class _Unwrapped:
+        steps = 200
+
+    class _Env:
+        unwrapped = _Unwrapped()
+
+        @staticmethod
+        def step(_action: int):
+            # Collision terminal should remain terminal.
+            return (1, 1, 2, 2), -100.0, True, {}
+
+    adapter = object.__new__(SnakeEnvAdapter)
+    adapter.env = _Env()
+    adapter.obs = (1, 1, 2, 2)
+    adapter.done = False
+    adapter.score = 0.0
+    adapter.normalize_rewards = True
+    adapter.alive_reward = 0.001
+    adapter.potential_shaping_enabled = False
+    adapter.ignore_legacy_step_limit_termination = True
+    adapter.legacy_step_limit = 200
+    adapter._current_episode_frames = []
+    adapter._last_episode_frames = []
+    adapter._current_episode_render_frames = []
+    adapter._last_episode_render_frames = []
+    adapter._sanitize_action = lambda a: a
+    adapter._obs_to_grid = lambda _obs, force_typed=False: np.zeros((4, 4), dtype=np.uint8)
+
+    _obs, reward, done, _score = adapter.step(0)
+
+    assert done is True
+    assert reward == pytest.approx(-1.0)

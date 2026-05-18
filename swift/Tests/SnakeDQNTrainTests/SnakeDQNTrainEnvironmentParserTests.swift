@@ -14,6 +14,8 @@ import Testing
             "SNAKE_DQN_ALGORITHM": "single",
             "SNAKE_EPSILON_END": "0.03",
             "SNAKE_EPSILON_DECAY_STEPS": "300000",
+            "SNAKE_EVAL_ROLLING_WINDOW": "30",
+            "SNAKE_EVAL_SEEDS": "11, 22,33",
             "SNAKE_SEED": "99",
         ],
         base: base
@@ -28,6 +30,8 @@ import Testing
     #expect(parsed.dqnAlgorithm == .single)
     #expect(parsed.epsilonEnd == 0.03)
     #expect(parsed.epsilonDecaySteps == 300_000)
+    #expect(parsed.evalRollingWindow == 30)
+    #expect(parsed.evalFixedSeeds == [11, 22, 33])
     #expect(parsed.seed == 99)
 }
 

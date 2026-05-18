@@ -9,6 +9,7 @@ struct DQNEvaluator {
 
     func evaluate(
         episodes: Int,
+        fixedSeeds: [Int]?,
         selectAction: (MLXArray) -> SnakeAction
     ) async throws -> DQNEvaluationResult {
         precondition(episodes > 0, "Evaluation requires at least one episode.")
@@ -17,8 +18,11 @@ struct DQNEvaluator {
         var totalScore: Float = 0
         var totalApples = 0
 
-        for _ in 0..<episodes {
-            let episodeResult = try await runEvaluationEpisode(selectAction: selectAction)
+        for index in 0..<episodes {
+            let seed = fixedSeeds.map { seeds in
+                seeds[index % seeds.count]
+            }
+            let episodeResult = try await runEvaluationEpisode(seed: seed, selectAction: selectAction)
             totalReward += episodeResult.totalReward
             totalScore += episodeResult.finalScore
             totalApples += episodeResult.applesEaten
@@ -33,6 +37,7 @@ struct DQNEvaluator {
     }
 
     private func runEvaluationEpisode(
+        seed: Int?,
         selectAction: (MLXArray) -> SnakeAction
     ) async throws -> DQNEpisodeResult {
         var stepsInEpisode = 0
@@ -40,7 +45,7 @@ struct DQNEvaluator {
         var finalScore: Float = 0
         var applesEaten = 0
 
-        let initial = try await env.reset()
+        let initial = try await env.reset(seed: seed)
         var frameStack = FrameStack(capacity: 4)
         frameStack.reset(frame: initial.data)
         var state = stateTensor(from: frameStack.stacked(), width: initial.width, height: initial.height)
