@@ -278,6 +278,25 @@ GIF and play variables:
 - `SNAKE_PLAY_EPISODES`: number of playback episodes.
 - `SNAKE_PLAY_RENDER`: render playback through Python/pygame.
 - `SNAKE_PLAY_GIF_DIR`: playback GIF output directory.
+- `SNAKE_PLAY_ACTIVATIONS`: enable activation inspection during play mode.
+- `SNAKE_PLAY_ACTIVATION_DIR`: output directory for per-step activation files.
+- `SNAKE_PLAY_ACTIVATION_EVERY_STEPS`: export activations every N play steps.
+- `SNAKE_PLAY_ACTIVATION_DASHBOARD`: show a separate live pygame dashboard window with labeled color heatmaps.
+- `SNAKE_PLAY_STEP_MODE`: pause before each action during activation playback.
+- `SNAKE_PLAY_STEP_INTERVAL_SECONDS`: auto-advance interval in step mode, default `2`; set `0` for manual Enter/`r`/`q` controls.
+
+Activation playback example:
+
+```sh
+SNAKE_PLAY_ACTIVATIONS=1 \
+SNAKE_PLAY_ACTIVATION_DASHBOARD=1 \
+SNAKE_PLAY_STEP_MODE=1 \
+SNAKE_PLAY_STEP_INTERVAL_SECONDS=2 \
+SNAKE_PLAY_ACTIVATION_DIR=runs/model_best_play/activations \
+make play-dqn
+```
+
+When activation inspection is enabled, play mode prints the selected action and Q-values for each inspected step. It can also open a separate annotated dashboard window with color heatmaps for the input stack, `conv1`, `conv2`, dense activations, and Q-values. File export still writes grayscale PGM heatmaps plus a TSV with per-action Q-values and the selected action.
 
 ## Metrics
 

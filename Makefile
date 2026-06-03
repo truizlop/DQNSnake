@@ -44,6 +44,9 @@ SHELL := /bin/zsh
 # - `SNAKE_OBS_ENABLE`, `SNAKE_OBS_LOG_PATH`: structured observability log controls.
 # - `SNAKE_BEST_GIF_ENABLE`, `SNAKE_BEST_GIF_DIR`: training best-episode GIF capture.
 # - `SNAKE_PLAY_EPISODES`, `SNAKE_PLAY_RENDER`, `SNAKE_PLAY_GIF_DIR`: play-mode controls.
+# - `SNAKE_PLAY_ACTIVATIONS`, `SNAKE_PLAY_ACTIVATION_DIR`,
+#   `SNAKE_PLAY_ACTIVATION_EVERY_STEPS`, `SNAKE_PLAY_ACTIVATION_DASHBOARD`,
+#   `SNAKE_PLAY_STEP_MODE`, `SNAKE_PLAY_STEP_INTERVAL_SECONDS`: activation debug controls.
 #
 # Useful long-run example:
 #
@@ -93,7 +96,7 @@ docs: ## Print the Makefile documentation header
 
 setup: ## Install Python runtime/test dependencies
 	$(PYTHON) -m pip install --upgrade pip
-	$(PYTHON) -m pip install gym gym-snake numpy pytest pillow tensorboard
+	$(PYTHON) -m pip install gym gym-snake numpy pytest pillow pygame tensorboard
 
 build: build-swift ## Build all compiled components
 
