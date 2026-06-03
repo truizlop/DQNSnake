@@ -11,7 +11,7 @@ struct SnakeDQNTrainApp {
     static func main() async {
         let env = ProcessInfo.processInfo.environment
         let pythonDir = env["SNAKE_PYTHON_DIR"]
-        var config = SnakeDQNTrainEnvironmentParser.parseConfig(
+        let config = SnakeDQNTrainEnvironmentParser.parseConfig(
             env: env,
             base: DQNHyperparameterBaseline.snakeV1
         )
@@ -29,8 +29,12 @@ struct SnakeDQNTrainApp {
         )
 
         do {
-            try await trainer.run()
-            print("snake-dqn-train skeleton run completed.")
+            if config.evalOnly {
+                _ = try await trainer.runEvaluationOnly()
+            } else {
+                try await trainer.run()
+                print("snake-dqn-train skeleton run completed.")
+            }
         } catch {
             fputs("snake-dqn-train error: \(error)\n", stderr)
             exit(1)

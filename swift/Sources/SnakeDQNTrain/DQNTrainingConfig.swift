@@ -38,6 +38,9 @@ struct DQNTrainingConfig {
     var batchSize: Int = 32
     var gamma: Float = 0.99
     var learningRate: Float = 2.5e-4
+    var learningRateFinal: Float? = nil
+    var learningRateDecayStartStep: Int? = nil
+    var learningRateDecayEndStep: Int? = nil
     var maxConsecutiveSkippedUpdates: Int = 500
     var gradientClipNorm: Float = 10
     var maxLossForUpdate: Float = 1_000_000
@@ -49,4 +52,7 @@ struct DQNTrainingConfig {
     var epsilonStart: Float = 1.0
     var epsilonEnd: Float = 0.1
     var epsilonDecaySteps: Int = 100_000
+
+    // Evaluation-only mode
+    var evalOnly: Bool = false
 }

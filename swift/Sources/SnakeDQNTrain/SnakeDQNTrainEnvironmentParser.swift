@@ -30,6 +30,12 @@ enum SnakeDQNTrainEnvironmentParser {
         config.warmupSteps = Int(env["SNAKE_WARMUP_STEPS"] ?? "") ?? config.warmupSteps
         config.trainEvery = Int(env["SNAKE_TRAIN_EVERY"] ?? "") ?? config.trainEvery
         config.gradientClipNorm = Float(env["SNAKE_GRAD_CLIP_NORM"] ?? "") ?? config.gradientClipNorm
+        config.learningRate = Float(env["SNAKE_LEARNING_RATE"] ?? "") ?? config.learningRate
+        config.learningRateFinal = env["SNAKE_LEARNING_RATE_FINAL"].flatMap(Float.init) ?? config.learningRateFinal
+        config.learningRateDecayStartStep =
+            env["SNAKE_LEARNING_RATE_DECAY_START_STEP"].flatMap(Int.init) ?? config.learningRateDecayStartStep
+        config.learningRateDecayEndStep =
+            env["SNAKE_LEARNING_RATE_DECAY_END_STEP"].flatMap(Int.init) ?? config.learningRateDecayEndStep
         config.epsilonStart = Float(env["SNAKE_EPSILON_START"] ?? "") ?? config.epsilonStart
         config.epsilonEnd = Float(env["SNAKE_EPSILON_END"] ?? "") ?? config.epsilonEnd
         config.epsilonDecaySteps = Int(env["SNAKE_EPSILON_DECAY_STEPS"] ?? "") ?? config.epsilonDecaySteps
@@ -48,6 +54,7 @@ enum SnakeDQNTrainEnvironmentParser {
         config.bestEpisodeGIFFrameDurationMs =
             Int(env["SNAKE_BEST_GIF_FRAME_MS"] ?? "") ?? config.bestEpisodeGIFFrameDurationMs
         config.seed = env["SNAKE_SEED"].flatMap(Int.init)
+        config.evalOnly = (env["SNAKE_EVAL_ONLY"] ?? (config.evalOnly ? "1" : "0")) == "1"
         config.dqnAlgorithm = DQNAlgorithm(
             rawValue: (env["SNAKE_DQN_ALGORITHM"] ?? config.dqnAlgorithm.rawValue).lowercased()
         ) ?? config.dqnAlgorithm

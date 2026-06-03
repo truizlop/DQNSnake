@@ -12,10 +12,15 @@ import Testing
             "SNAKE_PER_BETA_ANNEAL_STEPS": "200000",
             "SNAKE_PER_EPSILON": "0.002",
             "SNAKE_DQN_ALGORITHM": "single",
+            "SNAKE_LEARNING_RATE": "0.0003",
+            "SNAKE_LEARNING_RATE_FINAL": "0.0001",
+            "SNAKE_LEARNING_RATE_DECAY_START_STEP": "15000000",
+            "SNAKE_LEARNING_RATE_DECAY_END_STEP": "25000000",
             "SNAKE_EPSILON_END": "0.03",
             "SNAKE_EPSILON_DECAY_STEPS": "300000",
             "SNAKE_EVAL_ROLLING_WINDOW": "30",
             "SNAKE_EVAL_SEEDS": "11, 22,33",
+            "SNAKE_EVAL_ONLY": "1",
             "SNAKE_SEED": "99",
         ],
         base: base
@@ -28,10 +33,15 @@ import Testing
     #expect(parsed.prioritizedReplayBetaAnnealSteps == 200_000)
     #expect(parsed.prioritizedReplayEpsilon == 0.002)
     #expect(parsed.dqnAlgorithm == .single)
+    #expect(parsed.learningRate == 0.0003)
+    #expect(parsed.learningRateFinal == 0.0001)
+    #expect(parsed.learningRateDecayStartStep == 15_000_000)
+    #expect(parsed.learningRateDecayEndStep == 25_000_000)
     #expect(parsed.epsilonEnd == 0.03)
     #expect(parsed.epsilonDecaySteps == 300_000)
     #expect(parsed.evalRollingWindow == 30)
     #expect(parsed.evalFixedSeeds == [11, 22, 33])
+    #expect(parsed.evalOnly)
     #expect(parsed.seed == 99)
 }
 

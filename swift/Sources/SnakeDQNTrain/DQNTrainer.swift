@@ -84,25 +84,30 @@ struct DQNTrainer {
             try logger.start()
             self.structuredLogger = logger
         }
+        let runStartFields: [String: String] = [
+            "seed": config.seed.map(String.init) ?? "none",
+            "replay_sampling_strategy": "\(config.replaySamplingStrategy)",
+            "prioritized_replay_alpha": "\(config.prioritizedReplayAlpha)",
+            "prioritized_replay_beta_start": "\(config.prioritizedReplayBetaStart)",
+            "prioritized_replay_beta_anneal_steps": "\(config.prioritizedReplayBetaAnnealSteps)",
+            "prioritized_replay_epsilon": "\(config.prioritizedReplayEpsilon)",
+            "train_every": "\(config.trainEvery)",
+            "batch_size": "\(config.batchSize)",
+            "learning_rate": "\(config.learningRate)",
+            "learning_rate_final": config.learningRateFinal.map { "\($0)" } ?? "none",
+            "learning_rate_decay_start_step": config.learningRateDecayStartStep.map { "\($0)" } ?? "none",
+            "learning_rate_decay_end_step": config.learningRateDecayEndStep.map { "\($0)" } ?? "none",
+            "max_consecutive_skipped_updates": "\(config.maxConsecutiveSkippedUpdates)",
+            "gradient_clip_norm": "\(config.gradientClipNorm)",
+            "max_loss_for_update": "\(config.maxLossForUpdate)",
+            "max_abs_q_value": "\(config.maxAbsQValue)",
+            "max_gradient_l2_norm": "\(config.maxGradientL2Norm)",
+            "dqn_algorithm": config.dqnAlgorithm.rawValue,
+        ]
         structuredLogger?.log(
             event: "run_start",
             step: 0,
-            fields: [
-                "seed": config.seed.map(String.init) ?? "none",
-                "replay_sampling_strategy": "\(config.replaySamplingStrategy)",
-                "prioritized_replay_alpha": "\(config.prioritizedReplayAlpha)",
-                "prioritized_replay_beta_start": "\(config.prioritizedReplayBetaStart)",
-                "prioritized_replay_beta_anneal_steps": "\(config.prioritizedReplayBetaAnnealSteps)",
-                "prioritized_replay_epsilon": "\(config.prioritizedReplayEpsilon)",
-                "train_every": "\(config.trainEvery)",
-                "batch_size": "\(config.batchSize)",
-                "max_consecutive_skipped_updates": "\(config.maxConsecutiveSkippedUpdates)",
-                "gradient_clip_norm": "\(config.gradientClipNorm)",
-                "max_loss_for_update": "\(config.maxLossForUpdate)",
-                "max_abs_q_value": "\(config.maxAbsQValue)",
-                "max_gradient_l2_norm": "\(config.maxGradientL2Norm)",
-                "dqn_algorithm": config.dqnAlgorithm.rawValue,
-            ]
+            fields: runStartFields
         )
 
         var globalStep = try maybeResumeFromCheckpoint()
@@ -247,6 +252,25 @@ struct DQNTrainer {
         }
     }
 
+    mutating func runEvaluationOnly() async throws -> DQNEvaluationResult {
+        guard config.resumeCheckpointPath != nil else {
+            throw DQNEvaluationOnlyError.missingCheckpoint
+        }
+        let resumedStep = try maybeResumeFromCheckpoint()
+        let episodes = max(1, config.evalEpisodes)
+        let evaluation = try await evaluator.evaluate(
+            episodes: episodes,
+            fixedSeeds: config.evalFixedSeeds,
+            selectAction: { state in
+                learner.greedyAction(for: state)
+            }
+        )
+        print(
+            "eval_only checkpoint=\(config.resumeCheckpointPath ?? "") step=\(resumedStep) episodes=\(evaluation.episodes) avgReward=\(evaluation.averageReward) avgScore=\(evaluation.averageScore) avgApples=\(evaluation.averageApples)"
+        )
+        return evaluation
+    }
+
     private mutating func appendAndSummarizeEvaluation(score: Float, apples: Float) -> (
         window: Int,
         avgScore: Float,
@@ -329,6 +353,8 @@ struct DQNTrainer {
 
     private mutating func optimizeFromReplay(globalStep: Int) throws {
         let startedAt = Date()
+        let learningRate = currentLearningRate(globalStep: globalStep)
+        learner.setLearningRate(learningRate)
         let sample = replayBuffer.sample(batchSize: config.batchSize, importanceSamplingBeta: prioritizedReplayBeta(at: globalStep))
         let batch = DQNBatch(transitions: sample.transitions, importanceWeights: sample.importanceWeights)
         let tdErrors = learner.tdErrors(batch: batch)
@@ -348,6 +374,7 @@ struct DQNTrainer {
                     "train/skipped_update": metrics.skippedUpdate ? 1 : 0,
                     "train/consecutive_skipped_updates": Float(stabilityTracker.consecutiveSkippedUpdates),
                     "train/optimize_duration_s": optimizeDuration,
+                    "train/learning_rate": learningRate,
                 ]
             )
             structuredLogger?.log(
@@ -361,12 +388,23 @@ struct DQNTrainer {
                     "skipped_update": "\(metrics.skippedUpdate ? 1 : 0)",
                     "consecutive_skipped_updates": "\(stabilityTracker.consecutiveSkippedUpdates)",
                     "optimize_duration_s": "\(optimizeDuration)",
+                    "learning_rate": "\(learningRate)",
                     "batch_size": "\(config.batchSize)",
                     "replay_size": "\(replayBuffer.count)",
                     "replay_beta": "\(prioritizedReplayBeta(at: globalStep))",
                 ]
             )
         }
+    }
+
+    private func currentLearningRate(globalStep: Int) -> Float {
+        DQNLearningRateSchedule.learningRate(
+            at: globalStep,
+            initial: config.learningRate,
+            final: config.learningRateFinal,
+            decayStartStep: config.learningRateDecayStartStep,
+            decayEndStep: config.learningRateDecayEndStep
+        )
     }
 
     private func prioritizedReplayBeta(at globalStep: Int) -> Float {

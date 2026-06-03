@@ -61,6 +61,14 @@ final class DQNLearner {
         targetQNetwork.update(parameters: onlineQNetwork.parameters())
     }
 
+    func setLearningRate(_ learningRate: Float) {
+        optimizer.learningRate = learningRate
+    }
+
+    func currentLearningRate() -> Float {
+        optimizer.learningRate
+    }
+
     func saveOnlineModel(to url: URL, metadata: [String: String] = [:]) throws {
         let arrays = Dictionary(uniqueKeysWithValues: onlineQNetwork.parameters().flattened())
         try save(arrays: arrays, metadata: metadata, url: url)
