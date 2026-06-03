@@ -1,246 +1,184 @@
 # DQNSnake
 
-Single-player Snake training stack with:
-- Python `gym-snake` environment
-- Swift `SnakeEnv` bridge actor
-- Swift DQN training loop (MLX/MLXNN/MLXOptimizers)
-- Checkpointing, resume, evaluation, and TensorBoard metric streaming
+DQNSnake is a hybrid Snake reinforcement-learning project:
 
-## Current capabilities
+- Python owns the `gym-snake` environment adapter, rendering, GIF export, and JSON bridge server.
+- Swift owns the environment actor, typed bridge client, DQN implementation, replay buffer, training loop, evaluation loop, checkpointing, and model playback.
+- MLX/MLXNN/MLXOptimizers provide the neural network, optimizer, tensor operations, and `.safetensors` checkpoint format.
 
-- Python snake adapter around `gym-snake`
-- Typed Swift↔Python JSON bridge protocol payloads
-- Swift `SnakeEnv` actor API
-- DQN components in Swift:
-  - replay buffer (explicit sampling strategy)
-  - epsilon-greedy exploration policy
-  - online/target network training
-  - periodic target sync
-  - checkpoint save/load (`.safetensors`)
-  - periodic greedy evaluation loop
-  - training quality checks (loss/Q scale/gradient norm + skip-on-invalid update)
-- TensorBoard integration from Swift training process
-- Structured JSONL observability event log
-- Automatic GIF capture for new best training episodes
+The current best checkpoint is expected at `checkpoints/model_best.safetensors`. The curated training history and qualitative GIF progression live in [training.md](training.md).
 
-## Repository structure
+## Quick Start
 
-- `python/`
-  - `snake_env_adapter.py`: normalized env API, score tracking, frame grid conversion, reward mapping, initial snake length setup
-  - `bridge.py`: simple callable bridge module
-  - `bridge_server.py`: line-delimited JSON server used by Swift bridge
-  - `tensorboard_stream.py`: JSON scalar stream -> TensorBoard event files
-- `swift/`
-  - `Sources/SnakeEnv/`: actor API + bridge client
-  - `Sources/SnakeEnvCLI/`: Swift runner for environment stepping
-  - `Sources/SnakeDQNTrain/`: DQN training pipeline
-- `tests/`
-  - `smoke_snake_env.py`: smoke runner
-  - `visual_snake_env.py`: pygame visual runner
-  - `test_snake_env_adapter.py`: adapter and frame stack tests
-  - `swift/Tests/SnakeDQNTrainTests/`: DQN unit tests (checkpoint manager, policy behavior)
+Install Python dependencies:
 
-## Data/reward contract
+```sh
+make setup
+```
 
-- Observation is exposed as a 2D grid (`UInt8` / `np.uint8`) where:
-  - `0` = empty
-  - `1` = snake body
-  - `2` = snake head
-  - `3` = apple
-- Rewards are normalized to:
-  - `+1` apple
-  - `SNAKE_ALIVE_REWARD` normal step (default `0.0005`)
-  - `-1` terminal collision
-- `score` returned by env is cumulative reward.
+Run all tests:
 
-## Run commands
+```sh
+make test
+```
 
-From repo root:
+Play Snake with the best trained model:
 
-- `make setup`: install Python deps (`gym`, `gym-snake`, `numpy`, `pytest`)
-- `make build`: build Swift package
-- `make test`: run Python + Swift tests
-- `make run`: run Python smoke script
-- `make run-visual`: Python-controlled pygame visual loop
-  - `SNAKE_CONTROL=human make run-visual` for keyboard control (arrows, `R`, `Esc`/`Q`)
-- `make run-swift`: Swift-controlled rollout via bridge
-- `make run-swift-visual`: Swift-controlled rollout + pygame rendering
-- `make run-dqn`: run Swift DQN trainer target
-  - auto-builds `default.metallib` if missing (`make prepare-mlx-metallib`)
-- `make open-xcode`: open `swift/Package.swift` in Xcode with a sanitized Apple toolchain PATH
+```sh
+make play-dqn
+```
 
-Useful env vars:
+Evaluate the best checkpoint greedily:
 
-- `SNAKE_STEPS` (default `30` for `run-swift`, `20` for `run-dqn`)
-- `SNAKE_FPS` (visual modes)
-- `SNAKE_MAX_STEPS` (visual Python loop)
-- `SNAKE_MAX_EPISODE_STEPS` (Swift DQN trainer)
-- `SNAKE_PYTHON_EXE` (Python binary for Swift bridge; defaults to `/opt/anaconda3/bin/python3` when available)
-- `SNAKE_PYTHON_DIR` (Python module directory; defaults to `python/`)
-- `SNAKE_ENV_DIM` (default `20`; actual snake board size used by `gym-snake`)
-- `SNAKE_GRID_SIZE` (default `84`; observation size sent to Swift/model after nearest-neighbor resize)
-- `SNAKE_MLX_DEVICE` (`cpu` or `gpu`, default `cpu` for CLI stability)
-- `SNAKE_RESUME_CHECKPOINT` (path to `.safetensors` checkpoint to resume from)
-- `SNAKE_SEED` (optional int; enables deterministic replay sampling, epsilon exploration RNG, and seeded Python env resets)
-- `SNAKE_ALIVE_REWARD` (default `0.0005`; optional per-step reward for non-terminal, non-apple steps in normalized reward mode)
-- `SNAKE_POTENTIAL_SHAPING_ENABLE` (`0` default; enable potential-based shaping reward)
-- `SNAKE_POTENTIAL_SHAPING_GAMMA` (default `0.99`; shaping discount in `gamma * Phi(s') - Phi(s)`)
-- `SNAKE_POTENTIAL_SHAPING_SCALE` (default `0.1`; multiplier applied to shaping term)
+```sh
+make eval-dqn
+```
 
-Evaluation env vars:
-- `SNAKE_EVAL_EVERY_EPISODES` (default `0`, disabled)
-- `SNAKE_EVAL_EPISODES` (default `5`)
+Start a training run with the default Swift baseline:
 
-Training schedule override env vars:
-- `SNAKE_WARMUP_STEPS`
-- `SNAKE_TRAIN_EVERY`
-- `SNAKE_EPSILON_START` (default `1.0`)
-- `SNAKE_EPSILON_END` (default `0.1`)
-- `SNAKE_EPSILON_DECAY_STEPS` (default `100000`)
-- `SNAKE_TARGET_SYNC_EVERY`
-- `SNAKE_BATCH_SIZE`
-- `SNAKE_REPLAY_SAMPLING_STRATEGY` (`with_replacement` default; `without_replacement` or `prioritized`)
-- `SNAKE_PER_ALPHA` (default `0.6`; prioritization exponent)
-- `SNAKE_PER_BETA_START` (default `0.4`; initial importance-sampling correction)
-- `SNAKE_PER_BETA_ANNEAL_STEPS` (default `200000`; anneal beta to `1.0`)
-- `SNAKE_PER_EPSILON` (default `0.001`; small constant added to TD error before prioritization)
-- `SNAKE_DQN_ALGORITHM` (`double` default; `single` or `double`)
-- `SNAKE_CHECKPOINT_EVERY_STEPS`
-- `SNAKE_CHECKPOINT_DIR`
-- `SNAKE_RESOURCE_TELEMETRY_EVERY_STEPS` (default `100`, `0` disables in-process resource telemetry)
+```sh
+make train-dqn
+```
 
-TensorBoard env vars:
-- `SNAKE_TB_ENABLE` (`1` default)
-- `SNAKE_TB_LAUNCH` (`1` default; auto-launches TensorBoard process)
-- `SNAKE_TB_LOGDIR` (default `runs/snake_dqn`)
-- `SNAKE_TB_PORT` (default `6006`)
+Run a long GPU continuation with the latest strong setup:
 
-Observability env vars:
-- `SNAKE_OBS_ENABLE` (`1` default)
-- `SNAKE_OBS_LOG_PATH` (default `runs/snake_dqn/observability.jsonl`)
-- `SNAKE_BEST_GIF_ENABLE` (`1` default)
-- `SNAKE_BEST_GIF_DIR` (default `runs/best_episode_gifs`)
-- `SNAKE_BEST_GIF_SCALE` (default `8`)
-- `SNAKE_BEST_GIF_FRAME_MS` (default `80`)
+```sh
+SNAKE_MLX_DEVICE=gpu \
+SNAKE_STEPS=25000000 \
+SNAKE_RESUME_CHECKPOINT=checkpoints/model_step_14990000.safetensors \
+SNAKE_DQN_ALGORITHM=double \
+SNAKE_REPLAY_SAMPLING_STRATEGY=prioritized \
+SNAKE_PER_ALPHA=0.6 \
+SNAKE_PER_BETA_START=0.4 \
+SNAKE_PER_BETA_ANNEAL_STEPS=1000000 \
+SNAKE_PER_EPSILON=0.001 \
+SNAKE_EPSILON_END=0.05 \
+SNAKE_LEARNING_RATE=0.00025 \
+SNAKE_LEARNING_RATE_FINAL=0.000125 \
+SNAKE_LEARNING_RATE_DECAY_START_STEP=15000000 \
+SNAKE_LEARNING_RATE_DECAY_END_STEP=25000000 \
+make train-dqn
+```
 
-## TensorBoard usage
+## Make Targets
 
-`snake-dqn-train` can publish metrics directly to TensorBoard event files through `python/tensorboard_stream.py`.
+Current primary targets:
 
-Install TensorBoard in your Python environment:
-- `python3 -m pip install tensorboard`
+- `make help`: show available commands.
+- `make docs`: print the Makefile command documentation header.
+- `make setup`: install Python runtime and test dependencies.
+- `make build`: build the Swift package.
+- `make test`: run Python and Swift tests.
+- `make smoke-python`: run the Python environment smoke test.
+- `make visual-python`: run the Python visual loop; use `SNAKE_CONTROL=human` for keyboard control.
+- `make smoke-swift`: run the Swift bridge CLI with random actions.
+- `make visual-swift`: run the Swift bridge CLI with pygame rendering.
+- `make train-dqn`: build prerequisites, prepare MLX metallib, then run Swift DQN training.
+- `make eval-dqn`: build prerequisites, prepare MLX metallib, then run greedy evaluation against a checkpoint.
+- `make play-dqn`: build prerequisites, prepare MLX metallib, then run model-controlled Snake playback and export a GIF.
+- `make open-xcode`: open the Swift package in Xcode with a sanitized Apple toolchain environment.
+- `make clean`: remove local build/test caches while keeping `runs/` and `checkpoints/`.
 
-Typical run:
-- `make run-dqn`
+Backward-compatible aliases remain for older commands:
 
-If `SNAKE_TB_ENABLE=1` and `SNAKE_TB_LAUNCH=1`, TensorBoard is started automatically and available at:
-- `http://localhost:6006` (or `SNAKE_TB_PORT`)
+- `make run` and `make run-smoke` -> `make smoke-python`
+- `make run-visual` -> `make visual-python`
+- `make run-swift` -> `make smoke-swift`
+- `make run-swift-visual` -> `make visual-swift`
+- `make run-dqn` -> `make train-dqn`
 
-Logged scalar groups:
-- `train/loss`
-- `train/q_mean_abs`
-- `train/q_max_abs`
-- `train/grad_l2`
-- `train/skipped_update`
-- `train/episode_reward`
-- `train/episode_score`
-- `train/episode_steps`
-- `train/replay_size`
-- `train/replay_fill_ratio`
-- `train/epsilon`
-- `train/episode_duration_s`
-- `train/action_up`
-- `train/action_left`
-- `train/action_down`
-- `train/action_right`
-- `train/optimize_duration_s`
-- `train/consecutive_skipped_updates`
-- `train/stability_guard_triggered`
-- `runtime/rss_mb`
-- `runtime/vmem_mb`
-- `runtime/cpu_user_s`
-- `runtime/cpu_system_s`
-- `eval/avg_reward`
-- `eval/avg_score`
-- `train/episode_apples`
-- `eval/avg_apples`
+## Repository Layout
 
-Structured log event stream (`SNAKE_OBS_LOG_PATH`) includes:
-- `run_start`
-- `resume`
-- `episode_end`
-- `optimize_step`
-- `evaluation`
-- `target_sync`
-- `checkpoint_periodic_saved`
-- `checkpoint_best_saved`
-- `best_episode_gif_saved`
-- `stability_guard_triggered`
-- `resource_telemetry`
+- `python/snake_env_adapter.py`: wraps `gym-snake`, normalizes rewards/observations, handles action sanitization, ignores the legacy 200-step upstream time-limit terminal, and exports episode GIFs.
+- `python/bridge_server.py`: line-delimited JSON bridge used by Swift.
+- `python/bridge.py`: direct Python bridge helpers.
+- `python/tensorboard_stream.py`: writes scalar events consumed by TensorBoard.
+- `swift/Sources/SnakeEnv/`: Swift actor API, frame stack, typed bridge client, and bridge payloads.
+- `swift/Sources/SnakeEnvCLI/`: simple Swift rollout CLI for bridge smoke testing.
+- `swift/Sources/SnakeDQNTrain/`: DQN model, learner, trainer, replay buffer, evaluator, player, checkpointing, metrics, schedules, and runtime parsing.
+- `tests/`: Python adapter and bridge integration tests.
+- `swift/Tests/`: Swift unit and integration tests for bridge behavior, replay, learner math/stability, parser defaults, schedules, logging, and tensor layout.
+- `runs/`: generated local TensorBoard/observability run artifacts; not required for the committed project record.
+- `checkpoints/`: retained meaningful `.safetensors` checkpoints.
+- `training_gifs/`: curated GIFs illustrating qualitative learning progression.
 
-## Swift API
+## Architecture
 
-`SnakeEnv` actor currently exposes:
+The training process is launched from Swift through the `snake-dqn-train` executable.
 
-- `reset() async throws -> Frame`
-- `step(action: Int) async throws -> StepResult`
-- `score() async -> Float`
-- `isDone() async -> Bool`
-- `render() async throws`
+1. Swift starts or connects to the Python bridge.
+2. Python creates a normalized `gym-snake` environment.
+3. Swift resets the environment and maintains a 4-frame stack.
+4. The stacked frames are converted to an MLX tensor shaped `[1, height, width, 4]`.
+5. The online DQN chooses actions through epsilon-greedy exploration during training.
+6. Transitions are stored in replay.
+7. After warmup, Swift samples minibatches and trains the online network.
+8. The target network is periodically synchronized from the online network.
+9. Evaluation runs greedily, without epsilon exploration.
+10. Checkpoints, TensorBoard metrics, structured logs, and best-episode GIFs are written during training.
 
-## Training behavior summary
+## Observation Contract
 
-- Replay buffer sampling is explicit:
-  - `withReplacement`
-  - `withoutReplacement`
-- Checkpointing:
-  - periodic: `model_step_<globalStep>.safetensors`
-  - best: `model_best.safetensors` (currently best by training episode score)
-- Resume:
-  - loads online model from checkpoint
-  - syncs target model from loaded online model
-  - resumes `global_step` from checkpoint metadata when present
-- Update quality checks:
-  - tracks loss, Q scale, gradient L2 norm
-  - skips optimizer update if loss/gradients are non-finite
+The model input is intentionally image-like and binary:
 
-## Current caveats / notes
+- Python reconstructs a grid from `gym-snake` state.
+- By default, the training observation is binary: `0` for empty and `1` for any occupied/meaningful tile.
+- The agent receives 4 stacked frames so the network can infer movement, head position, and dynamics from temporal changes instead of explicit entity labels.
+- The Python adapter keeps a typed grid internally for rendering/GIF export so apples, head, and body can be colored correctly in visual output.
+- The default environment board is `20x20`, resized by nearest-neighbor sampling to `84x84` for the model.
 
-- `gym-snake` upstream uses old Gym APIs and emits deprecation warnings.
-- Training uses a smaller env board (`SNAKE_ENV_DIM`) and resizes observations to `SNAKE_GRID_SIZE`; this keeps apple density practical while preserving the model input shape.
-- Reversing direction into the snake body causes immediate terminal state (confirmed behavior).
-- MLX runtime requirements (Metal / bundled libs) still apply depending on your local setup.
-- Optimizer state checkpoint/resume is not yet implemented (model weights resume is implemented).
+This was a deliberate decision: the input resembles a binarized screenshot rather than a hand-authored feature vector.
 
-## Toolchain / Linker troubleshooting
+## Reward Contract
 
-If you see linker/toolchain failures in Swift/Xcode (for example, unexpected linker flags not recognized by `ld`), your shell PATH may be resolving a non-Apple linker first (commonly Conda's `/opt/anaconda3/bin/ld`).
+Normalized rewards are:
 
-This repo includes `scripts/with_apple_toolchain.sh`, and Make targets already use it for Swift commands.
+- `+1` for eating an apple.
+- `SNAKE_ALIVE_REWARD` for a normal non-terminal step, default `0.0005`.
+- `-1` for terminal collision.
 
-Recommended usage:
-- `make test-swift`
-- `make run-dqn`
-- `make open-xcode` (launch Xcode from a sanitized environment)
+Optional potential-based shaping is available but not part of the latest strong baseline:
 
-Quick check:
-- `./scripts/with_apple_toolchain.sh /bin/sh -lc 'which ld; xcrun -f ld'`
+- `SNAKE_POTENTIAL_SHAPING_ENABLE=1`
+- `SNAKE_POTENTIAL_SHAPING_GAMMA=0.99`
+- `SNAKE_POTENTIAL_SHAPING_SCALE=0.1`
 
-Both paths should point to Apple's linker locations under `/usr/bin` or Xcode's default toolchain.
+The shaping term is based on Manhattan distance to the apple and is implemented as `gamma * Phi(s') - Phi(s)`, so it can provide denser directional feedback while preserving the optimal policy under the usual potential-based shaping assumptions.
 
-## Reproducibility
+## Current DQN Implementation
 
-Set `SNAKE_SEED` to a fixed integer to improve run-to-run reproducibility. When set:
-- Swift replay buffer sampling uses a deterministic PRNG.
-- Swift epsilon-greedy exploration sampling uses a deterministic PRNG.
-- Python env is seeded, and each `reset()` uses `seed + reset_count` for deterministic episode progression.
+Implemented training features:
 
-## Hyperparameter baseline
+- Int-backed `SnakeAction` enum to prevent illegal action values in DQN transitions.
+- 4-frame state stacking.
+- Convolutional DQN model in Swift/MLX.
+- Epsilon-greedy exploration policy.
+- Replay buffer with explicit sampling strategy.
+- Uniform sampling with and without replacement.
+- Prioritized Experience Replay with alpha, beta annealing, epsilon, importance weights, and TD-error priority updates.
+- Single DQN and Double DQN modes through `SNAKE_DQN_ALGORITHM`.
+- Online and target networks with periodic target synchronization.
+- Bellman TD targets with `gamma=0.99` by default.
+- Gradient clipping.
+- Loss, Q-scale, gradient-norm, and non-finite update guards.
+- Learning-rate decay controls.
+- Greedy evaluation loop.
+- Evaluation-driven best checkpoint selection.
+- Checkpoint resume for model weights and global-step metadata.
+- TensorBoard scalar metrics.
+- Structured JSONL observability logs.
+- Resource telemetry.
+- Best-training-episode GIF capture.
+- Play-only mode for running a trained checkpoint.
 
-The trainer now uses a named baseline profile: `DQNHyperparameterBaseline.snakeV1` in
-`swift/Sources/SnakeDQNTrain/DQNHyperparameterBaseline.swift`.
+Optimizer state is not checkpointed. Resume restores model weights and global-step metadata, then synchronizes the target network from the loaded online network.
 
-Current `snakeV1` values:
+## Baseline Defaults
+
+The named baseline lives in `swift/Sources/SnakeDQNTrain/DQNHyperparameterBaseline.swift` as `snakeV1`.
+
+Important defaults:
+
 - `totalEnvironmentSteps`: `200_000`
 - `maxStepsPerEpisode`: `2_000`
 - `replayBufferCapacity`: `100_000`
@@ -249,16 +187,208 @@ Current `snakeV1` values:
 - `trainEvery`: `4`
 - `targetSyncEvery`: `10_000`
 - `batchSize`: `32`
-- `learningRate`: `2.5e-4`
 - `gamma`: `0.99`
+- `learningRate`: `0.00025`
+- `gradientClipNorm`: `10`
+- `dqnAlgorithm`: `double`
 - `epsilonStart`: `1.0`
 - `epsilonEnd`: `0.1`
 - `epsilonDecaySteps`: `100_000`
 - `evalEveryEpisodes`: `25`
 - `evalEpisodes`: `5`
-- `maxConsecutiveSkippedUpdates`: `500`
-- `maxLossForUpdate`: `1_000_000`
-- `maxAbsQValue`: `1_000_000`
-- `maxGradientL2Norm`: `1_000_000`
+- `prioritizedReplayAlpha`: `0.6`
+- `prioritizedReplayBetaStart`: `0.4`
+- `prioritizedReplayBetaAnnealSteps`: `1_000_000`
+- `prioritizedReplayEpsilon`: `0.001`
 
-Runtime env vars still override these defaults at launch.
+The default sampling strategy remains uniform with replacement for simple runs. Long training runs should usually override it with `SNAKE_REPLAY_SAMPLING_STRATEGY=prioritized`.
+
+## Runtime Configuration
+
+Core training variables:
+
+- `SNAKE_STEPS`: total environment steps.
+- `SNAKE_MAX_EPISODE_STEPS`: Swift-side episode cap.
+- `SNAKE_RESUME_CHECKPOINT`: checkpoint path to load.
+- `SNAKE_MLX_DEVICE`: `cpu` or `gpu`.
+- `SNAKE_SEED`: deterministic Swift replay/exploration RNG plus Python reset seeding.
+- `SNAKE_DQN_ALGORITHM`: `single` or `double`.
+- `SNAKE_REPLAY_SAMPLING_STRATEGY`: `with_replacement`, `without_replacement`, or `prioritized`.
+- `SNAKE_BATCH_SIZE`: minibatch size.
+- `SNAKE_WARMUP_STEPS`: replay warmup before training.
+- `SNAKE_TRAIN_EVERY`: optimize every N environment steps.
+- `SNAKE_TARGET_SYNC_EVERY`: target-network sync interval.
+- `SNAKE_CHECKPOINT_EVERY_STEPS`: periodic checkpoint interval.
+- `SNAKE_CHECKPOINT_DIR`: checkpoint output directory.
+
+PER variables:
+
+- `SNAKE_PER_ALPHA`: prioritization exponent.
+- `SNAKE_PER_BETA_START`: initial importance-sampling correction.
+- `SNAKE_PER_BETA_ANNEAL_STEPS`: steps to anneal beta to `1.0`.
+- `SNAKE_PER_EPSILON`: small constant added to TD error before priority calculation.
+
+Exploration and learning-rate variables:
+
+- `SNAKE_EPSILON_START`: initial epsilon.
+- `SNAKE_EPSILON_END`: epsilon floor.
+- `SNAKE_EPSILON_DECAY_STEPS`: linear epsilon decay duration.
+- `SNAKE_LEARNING_RATE`: initial learning rate.
+- `SNAKE_LEARNING_RATE_FINAL`: optional final learning rate.
+- `SNAKE_LEARNING_RATE_DECAY_START_STEP`: global step where LR decay starts.
+- `SNAKE_LEARNING_RATE_DECAY_END_STEP`: global step where LR decay ends.
+- `SNAKE_GRAD_CLIP_NORM`: gradient clipping threshold.
+
+Environment variables:
+
+- `SNAKE_PYTHON_EXE`: Python binary used by Swift bridge.
+- `SNAKE_PYTHON_DIR`: Python module directory, usually `python`.
+- `SNAKE_ENV_DIM`: underlying Snake board dimension, default `20`.
+- `SNAKE_GRID_SIZE`: observation size after resize, default `84`.
+- `SNAKE_ALIVE_REWARD`: alive-step reward, default `0.0005`.
+- `SNAKE_POTENTIAL_SHAPING_ENABLE`: enable potential-based shaping.
+- `SNAKE_POTENTIAL_SHAPING_GAMMA`: shaping gamma.
+- `SNAKE_POTENTIAL_SHAPING_SCALE`: shaping multiplier.
+
+Evaluation variables:
+
+- `SNAKE_EVAL_ONLY`: run evaluation only.
+- `SNAKE_EVAL_EVERY_EPISODES`: training evaluation frequency.
+- `SNAKE_EVAL_EPISODES`: number of greedy eval episodes.
+- `SNAKE_EVAL_SEEDS`: comma-separated fixed eval seeds.
+- `SNAKE_EVAL_ROLLING_WINDOW`: moving-average window in evaluation summaries.
+
+TensorBoard and observability variables:
+
+- `SNAKE_TB_ENABLE`: enable TensorBoard metrics.
+- `SNAKE_TB_LAUNCH`: launch TensorBoard automatically.
+- `SNAKE_TB_LOGDIR`: TensorBoard log directory.
+- `SNAKE_TB_PORT`: TensorBoard port.
+- `SNAKE_OBS_ENABLE`: enable structured JSONL logs.
+- `SNAKE_OBS_LOG_PATH`: structured log path.
+- `SNAKE_RESOURCE_TELEMETRY_EVERY_STEPS`: resource telemetry interval, or `0` to disable.
+
+GIF and play variables:
+
+- `SNAKE_BEST_GIF_ENABLE`: enable best-training-episode GIF capture.
+- `SNAKE_BEST_GIF_DIR`: best-training-episode GIF directory.
+- `SNAKE_BEST_GIF_SCALE`: GIF pixel scale.
+- `SNAKE_BEST_GIF_FRAME_MS`: GIF frame duration.
+- `SNAKE_PLAY_ONLY`: run model playback only.
+- `SNAKE_PLAY_EPISODES`: number of playback episodes.
+- `SNAKE_PLAY_RENDER`: render playback through Python/pygame.
+- `SNAKE_PLAY_GIF_DIR`: playback GIF output directory.
+
+## Metrics
+
+TensorBoard metrics include:
+
+- `train/loss`
+- `train/q_mean_abs`
+- `train/q_max_abs`
+- `train/grad_l2`
+- `train/skipped_update`
+- `train/episode_reward`
+- `train/episode_score`
+- `train/episode_apples`
+- `train/episode_steps`
+- `train/replay_size`
+- `train/replay_fill_ratio`
+- `train/epsilon`
+- `train/optimize_duration_s`
+- `train/action_up`
+- `train/action_left`
+- `train/action_down`
+- `train/action_right`
+- `runtime/rss_mb`
+- `runtime/vmem_mb`
+- `runtime/cpu_user_s`
+- `runtime/cpu_system_s`
+- `eval/avg_reward`
+- `eval/avg_score`
+- `eval/avg_apples`
+
+Structured logs include run lifecycle, resume events, episode summaries, optimize-step summaries, evaluation summaries, target syncs, checkpoint saves, GIF saves, stability guards, and resource telemetry.
+
+## Design Decisions
+
+Key decisions made during the project:
+
+- Use Python only for environment ownership because `gym-snake` and pygame rendering already exist there.
+- Use Swift for the RL system to keep the DQN implementation, training control, and tests in the Swift package.
+- Communicate through typed JSON bridge payloads rather than untyped dictionaries on the Swift side.
+- Keep one top-level Swift type per file to make the codebase easier to navigate and review.
+- Model actions as `SnakeAction` instead of raw `Int` in DQN data structures.
+- Keep observations binary and stacked over 4 frames so the network learns motion and entity roles from temporal evidence.
+- Use a `20x20` Snake board resized to `84x84` to keep apple density learnable while preserving the DQN image-input shape.
+- Ignore the upstream `gym-snake` 200-step legacy truncation as terminal failure because it artificially caps long successful episodes.
+- Sanitize immediate 180-degree snake reversals before sending them to the environment because those invalid actions otherwise dominate early learning.
+- Track apples separately from reward/score because shaped or alive rewards make raw score less interpretable.
+- Prefer greedy evaluation without epsilon so eval metrics measure policy quality, not exploration noise.
+- Use Double DQN to reduce overestimation bias.
+- Use PER for long runs because successful and high-TD-error transitions are rare and more informative than uniform random samples.
+- Keep PER, Double DQN, epsilon, learning-rate decay, and shaping controlled by environment variables so experiments are reproducible from shell commands.
+- Save best checkpoints from evaluation metrics rather than noisy training episode returns.
+- Capture best-training-episode GIFs to support qualitative inspection, not as the source of truth for model selection.
+- Do not resume optimizer state for now; this keeps checkpointing simple, and model-only resume has been sufficient for these experiments.
+
+## Testing
+
+Python coverage focuses on:
+
+- Adapter reset/step behavior.
+- Frame-stack and observation properties.
+- Reward configuration validation.
+- Python bridge request/response integration.
+- Swift-to-Python bridge contract behavior.
+
+Swift coverage focuses on:
+
+- `SnakeEnv` actor behavior.
+- Python bridge integration.
+- Replay sampling strategies.
+- Prioritized replay sampling and priority updates.
+- PER beta schedule.
+- Epsilon-greedy action selection.
+- Learner Bellman math, Double DQN target selection, gradient stability, and stop-gradient behavior.
+- Checkpoint manager behavior.
+- Environment parser defaults and runtime overrides.
+- Learning-rate schedule.
+- Structured logger output.
+- State tensor layout.
+
+Run the full suite with:
+
+```sh
+make test
+```
+
+## Toolchain Notes
+
+Swift/MLX command-line runs need an Apple toolchain and MLX Metal support. The Makefile wraps Swift commands with `scripts/with_apple_toolchain.sh` to avoid accidentally picking up Conda or other non-Apple linker binaries.
+
+If you see linker errors, check the linker resolution:
+
+```sh
+./scripts/with_apple_toolchain.sh /bin/sh -lc 'which ld; xcrun -f ld'
+```
+
+The paths should resolve to Apple/Xcode toolchain locations, not Conda.
+
+DQN targets depend on `prepare-mlx-metallib`, which first runs `build-swift` so a fresh checkout has the MLX Swift dependency checkout available, then calls `scripts/ensure_mlx_metallib.sh` so command-line MLX runs can find `default.metallib`.
+
+## Training History
+
+The meaningful training results are documented in [training.md](training.md). The strongest completed run so far was the 25M-step continuation using GPU, Double DQN, PER, epsilon floor `0.05`, and learning-rate decay from `0.00025` to `0.000125`.
+
+The current best checkpoint is:
+
+```text
+checkpoints/model_best.safetensors
+```
+
+Use it with:
+
+```sh
+make play-dqn
+```
