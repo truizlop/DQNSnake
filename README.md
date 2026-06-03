@@ -28,6 +28,15 @@ Play Snake with the best trained model:
 make play-dqn
 ```
 
+Play with live neural-network activation heatmaps:
+
+```sh
+SNAKE_PLAY_ACTIVATIONS=1 \
+SNAKE_PLAY_ACTIVATION_DASHBOARD=1 \
+SNAKE_PLAY_STEP_MODE=1 \
+make play-dqn
+```
+
 Evaluate the best checkpoint greedily:
 
 ```sh
@@ -93,6 +102,7 @@ Backward-compatible aliases remain for older commands:
 - `python/bridge_server.py`: line-delimited JSON bridge used by Swift.
 - `python/bridge.py`: direct Python bridge helpers.
 - `python/tensorboard_stream.py`: writes scalar events consumed by TensorBoard.
+- `python/activation_viewer.py`: live pygame dashboard for neural-network activation heatmaps during model playback.
 - `swift/Sources/SnakeEnv/`: Swift actor API, frame stack, typed bridge client, and bridge payloads.
 - `swift/Sources/SnakeEnvCLI/`: simple Swift rollout CLI for bridge smoke testing.
 - `swift/Sources/SnakeDQNTrain/`: DQN model, learner, trainer, replay buffer, evaluator, player, checkpointing, metrics, schedules, and runtime parsing.
@@ -116,6 +126,7 @@ The training process is launched from Swift through the `snake-dqn-train` execut
 8. The target network is periodically synchronized from the online network.
 9. Evaluation runs greedily, without epsilon exploration.
 10. Checkpoints, TensorBoard metrics, structured logs, and best-episode GIFs are written during training.
+11. Play mode can optionally inspect the network and stream activations to a separate pygame dashboard.
 
 ## Observation Contract
 
@@ -285,7 +296,11 @@ GIF and play variables:
 - `SNAKE_PLAY_STEP_MODE`: pause before each action during activation playback.
 - `SNAKE_PLAY_STEP_INTERVAL_SECONDS`: auto-advance interval in step mode, default `2`; set `0` for manual Enter/`r`/`q` controls.
 
-Activation playback example:
+## Activation Dashboard
+
+The activation dashboard is a debugging mode for watching what the trained network sees while Snake is playing. It is intended for qualitative inspection, not training. Swift runs the policy, captures the input stack, `conv1`, `conv2`, dense activations, and Q-values, then streams them to `python/activation_viewer.py` as line-delimited JSON.
+
+Run it with:
 
 ```sh
 SNAKE_PLAY_ACTIVATIONS=1 \
@@ -296,7 +311,15 @@ SNAKE_PLAY_ACTIVATION_DIR=runs/model_best_play/activations \
 make play-dqn
 ```
 
-When activation inspection is enabled, play mode prints the selected action and Q-values for each inspected step. It can also open a separate annotated dashboard window with color heatmaps for the input stack, `conv1`, `conv2`, dense activations, and Q-values. File export still writes grayscale PGM heatmaps plus a TSV with per-action Q-values and the selected action.
+Dashboard behavior:
+
+- The input stack shows four recent binary frames labeled `t-3`, `t-2`, `t-1`, and `t`.
+- `conv1` and `conv2` are rendered as tiled channel heatmaps with black padding between tiles.
+- Dense activations and Q-values are shown separately so action preferences can be compared against the selected action.
+- Spatial heatmaps are transposed for display so they match the pygame gameplay orientation. This is display-only; the model input tensor and saved checkpoint behavior are unchanged.
+- `SNAKE_PLAY_STEP_INTERVAL_SECONDS` controls auto-step speed in step mode. The default is `2`; set it to `0` for manual stepping with Enter, `r`, or `q`.
+
+When activation inspection is enabled, play mode also prints the selected action and Q-values for each inspected step. File export writes grayscale PGM heatmaps plus a TSV with per-action Q-values and the selected action.
 
 ## Metrics
 
