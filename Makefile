@@ -6,7 +6,7 @@ SWIFT_ENV := ./scripts/with_apple_toolchain.sh
 
 .DEFAULT_GOAL := help
 
-.PHONY: help setup build build-swift test test-python test-swift run run-smoke run-visual run-swift run-swift-visual run-dqn prepare-mlx-metallib open-xcode clean
+.PHONY: help setup build build-swift test test-python test-swift run run-smoke run-visual run-swift run-swift-visual run-dqn play-dqn prepare-mlx-metallib open-xcode clean
 
 help: ## Show available targets
 	@echo "Snake DQN - Main Commands"
@@ -57,6 +57,14 @@ run-dqn: ## Run DQN trainer
 	SNAKE_PYTHON_DIR=python \
 	SNAKE_PYTHON_EXE=/opt/anaconda3/bin/python3 \
 	SNAKE_MLX_DEVICE=$${SNAKE_MLX_DEVICE:-cpu} \
+	$(SWIFT_ENV) swift run --package-path $(SWIFT_DIR) snake-dqn-train
+
+play-dqn: ## Play Snake using the best trained DQN checkpoint
+	@$(SWIFT_ENV) ./scripts/ensure_mlx_metallib.sh; \
+	SNAKE_PYTHON_DIR=python \
+	SNAKE_PYTHON_EXE=/opt/anaconda3/bin/python3 \
+	SNAKE_MLX_DEVICE=$${SNAKE_MLX_DEVICE:-gpu} \
+	SNAKE_PLAY_ONLY=1 \
 	$(SWIFT_ENV) swift run --package-path $(SWIFT_DIR) snake-dqn-train
 
 open-xcode: ## Open Swift package in Xcode with Apple toolchain-sanitized environment

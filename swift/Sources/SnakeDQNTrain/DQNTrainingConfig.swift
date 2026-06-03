@@ -55,4 +55,10 @@ struct DQNTrainingConfig {
 
     // Evaluation-only mode
     var evalOnly: Bool = false
+
+    // Play-only mode
+    var playOnly: Bool = false
+    var playEpisodes: Int = 1
+    var playRender: Bool = true
+    var playGIFDirectory: String? = "runs/model_best_play"
 }

@@ -18,7 +18,8 @@ enum SnakeDQNTrainEnvironmentParser {
             Int(env["SNAKE_PER_BETA_ANNEAL_STEPS"] ?? "") ?? config.prioritizedReplayBetaAnnealSteps
         config.prioritizedReplayEpsilon = Float(env["SNAKE_PER_EPSILON"] ?? "") ?? config.prioritizedReplayEpsilon
         config.maxStepsPerEpisode = Int(env["SNAKE_MAX_EPISODE_STEPS"] ?? "") ?? config.maxStepsPerEpisode
-        config.resumeCheckpointPath = env["SNAKE_RESUME_CHECKPOINT"]
+        let explicitResumeCheckpointPath = env["SNAKE_RESUME_CHECKPOINT"]
+        config.resumeCheckpointPath = explicitResumeCheckpointPath
         config.enableTensorBoard = (env["SNAKE_TB_ENABLE"] ?? (config.enableTensorBoard ? "1" : "0")) == "1"
         config.launchTensorBoard = (env["SNAKE_TB_LAUNCH"] ?? (config.launchTensorBoard ? "1" : "0")) == "1"
         config.tensorBoardLogDir = env["SNAKE_TB_LOGDIR"] ?? config.tensorBoardLogDir
@@ -55,6 +56,17 @@ enum SnakeDQNTrainEnvironmentParser {
             Int(env["SNAKE_BEST_GIF_FRAME_MS"] ?? "") ?? config.bestEpisodeGIFFrameDurationMs
         config.seed = env["SNAKE_SEED"].flatMap(Int.init)
         config.evalOnly = (env["SNAKE_EVAL_ONLY"] ?? (config.evalOnly ? "1" : "0")) == "1"
+        config.playOnly = (env["SNAKE_PLAY_ONLY"] ?? (config.playOnly ? "1" : "0")) == "1"
+        config.playEpisodes = Int(env["SNAKE_PLAY_EPISODES"] ?? "") ?? config.playEpisodes
+        config.playRender = (env["SNAKE_PLAY_RENDER"] ?? (config.playRender ? "1" : "0")) == "1"
+        config.playGIFDirectory = env["SNAKE_PLAY_GIF_DIR"] ?? config.playGIFDirectory
+        if config.playOnly {
+            config.resumeCheckpointPath = explicitResumeCheckpointPath ?? "checkpoints/model_best.safetensors"
+            config.enableTensorBoard = false
+            config.launchTensorBoard = false
+            config.enableStructuredLogs = false
+            config.enableBestEpisodeGIFCapture = false
+        }
         config.dqnAlgorithm = DQNAlgorithm(
             rawValue: (env["SNAKE_DQN_ALGORITHM"] ?? config.dqnAlgorithm.rawValue).lowercased()
         ) ?? config.dqnAlgorithm

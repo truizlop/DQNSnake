@@ -21,6 +21,10 @@ import Testing
             "SNAKE_EVAL_ROLLING_WINDOW": "30",
             "SNAKE_EVAL_SEEDS": "11, 22,33",
             "SNAKE_EVAL_ONLY": "1",
+            "SNAKE_PLAY_ONLY": "1",
+            "SNAKE_PLAY_EPISODES": "2",
+            "SNAKE_PLAY_RENDER": "0",
+            "SNAKE_PLAY_GIF_DIR": "runs/custom_play",
             "SNAKE_SEED": "99",
         ],
         base: base
@@ -42,7 +46,28 @@ import Testing
     #expect(parsed.evalRollingWindow == 30)
     #expect(parsed.evalFixedSeeds == [11, 22, 33])
     #expect(parsed.evalOnly)
+    #expect(parsed.playOnly)
+    #expect(parsed.playEpisodes == 2)
+    #expect(parsed.playRender == false)
+    #expect(parsed.playGIFDirectory == "runs/custom_play")
+    #expect(parsed.resumeCheckpointPath == "checkpoints/model_best.safetensors")
+    #expect(parsed.enableTensorBoard == false)
+    #expect(parsed.launchTensorBoard == false)
+    #expect(parsed.enableStructuredLogs == false)
+    #expect(parsed.enableBestEpisodeGIFCapture == false)
     #expect(parsed.seed == 99)
+}
+
+@Test func environmentParserPreservesExplicitPlayCheckpointOverride() {
+    let parsed = SnakeDQNTrainEnvironmentParser.parseConfig(
+        env: [
+            "SNAKE_PLAY_ONLY": "1",
+            "SNAKE_RESUME_CHECKPOINT": "checkpoints/custom.safetensors",
+        ],
+        base: DQNHyperparameterBaseline.snakeV1
+    )
+
+    #expect(parsed.resumeCheckpointPath == "checkpoints/custom.safetensors")
 }
 
 @Test func environmentParserFallsBackOnInvalidValues() {

@@ -29,7 +29,9 @@ struct SnakeDQNTrainApp {
         )
 
         do {
-            if config.evalOnly {
+            if config.playOnly {
+                _ = try await trainer.runPlayOnly()
+            } else if config.evalOnly {
                 _ = try await trainer.runEvaluationOnly()
             } else {
                 try await trainer.run()

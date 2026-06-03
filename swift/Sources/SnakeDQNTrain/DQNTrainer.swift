@@ -271,6 +271,34 @@ struct DQNTrainer {
         return evaluation
     }
 
+    mutating func runPlayOnly() async throws -> [DQNEpisodeResult] {
+        guard config.resumeCheckpointPath != nil else {
+            throw DQNPlayOnlyError.missingCheckpoint
+        }
+        let resumedStep = try maybeResumeFromCheckpoint()
+        let player = DQNPlayer(
+            env: env,
+            maxStepsPerEpisode: config.maxStepsPerEpisode,
+            render: config.playRender,
+            gifDirectory: config.playGIFDirectory,
+            gifScale: config.bestEpisodeGIFScale,
+            gifFrameDurationMs: config.bestEpisodeGIFFrameDurationMs
+        )
+        let results = try await player.play(
+            episodes: max(1, config.playEpisodes),
+            fixedSeeds: config.evalFixedSeeds,
+            selectAction: { state in
+                learner.greedyAction(for: state)
+            }
+        )
+        let averageApples = Float(results.reduce(0) { $0 + $1.applesEaten }) / Float(results.count)
+        let averageScore = results.reduce(Float(0)) { $0 + $1.finalScore } / Float(results.count)
+        print(
+            "play summary checkpoint=\(config.resumeCheckpointPath ?? "") step=\(resumedStep) episodes=\(results.count) avgScore=\(averageScore) avgApples=\(averageApples)"
+        )
+        return results
+    }
+
     private mutating func appendAndSummarizeEvaluation(score: Float, apples: Float) -> (
         window: Int,
         avgScore: Float,
