@@ -8,6 +8,81 @@ DQNSnake is a hybrid Snake reinforcement-learning project:
 
 The current best checkpoint is expected at `checkpoints/model_best.safetensors`. The curated training history and qualitative GIF progression live in [training.md](training.md).
 
+## Background
+
+This project follows the Deep Q-Network line of work introduced by DeepMind in [Playing Atari with Deep Reinforcement Learning](https://arxiv.org/abs/1312.5602) and later published as [Human-level control through deep reinforcement learning](https://www.nature.com/articles/nature14236). The core idea is to learn an action-value function directly from visual observations, instead of manually programming Snake-specific rules.
+
+In reinforcement learning, the agent observes a state `s`, chooses an action `a`, receives a reward `r`, and transitions to the next state `s'`. The action-value function estimates how good an action is:
+
+```text
+Q(s, a) = expected discounted future reward after taking action a in state s
+```
+
+DQN approximates `Q(s, a)` with a neural network. In this project, the state is a stack of four binary Snake frames, shaped as `[1, height, width, 4]`, and the network outputs four Q-values, one for each `SnakeAction`.
+
+The Bellman target for regular DQN is:
+
+```text
+y = r + gamma * max_a' Q_target(s', a')        if the episode continues
+y = r                                          if the transition is terminal
+```
+
+The learner then minimizes the temporal-difference error:
+
+```text
+TD error = y - Q_online(s, a)
+loss = Huber(TD error)
+```
+
+`gamma` is the discount factor. A value close to `1` makes the agent care about delayed rewards, which matters for Snake because the action that leads to an apple may need to be chosen many steps before the apple is eaten.
+
+Rewards in this project are produced by the Python Snake adapter and normalized before Swift receives them. The important signals are:
+
+- Positive reward when the snake eats an apple.
+- Negative reward when the snake dies.
+- Optional tiny alive-step reward through `SNAKE_ALIVE_REWARD`.
+- Optional potential-based shaping through Manhattan distance to the apple.
+
+Experience replay stores transitions `(state, action, reward, nextState, done)` in a replay buffer and trains from minibatches sampled from past experience. This breaks the strong temporal correlation of consecutive gameplay frames and lets each transition be reused for more than one gradient update.
+
+Double DQN improves the Bellman target by separating action selection from action evaluation:
+
+```text
+a* = argmax_a' Q_online(s', a')
+y  = r + gamma * Q_target(s', a*)
+```
+
+This reduces the overestimation bias that can happen when the same network both chooses and evaluates the best next action. In this project it is controlled with `SNAKE_DQN_ALGORITHM=single|double`; the default strong training setup uses `double`.
+
+Prioritized Experience Replay samples more often from transitions with larger TD error, because those are usually the transitions the model currently learns the most from. Sampling probability is proportional to priority:
+
+```text
+P(i) = priority_i^alpha / sum(priority_j^alpha)
+```
+
+Because prioritized sampling changes the training distribution, each sampled transition receives an importance-sampling weight:
+
+```text
+w_i = (N * P(i))^(-beta)
+```
+
+The weights are normalized and applied to the loss so high-priority sampling does not fully bias the update. In this project PER is controlled with:
+
+- `SNAKE_REPLAY_SAMPLING_STRATEGY=uniform|prioritized`
+- `SNAKE_PER_ALPHA`: how strongly priority affects sampling.
+- `SNAKE_PER_BETA_START`: initial correction strength.
+- `SNAKE_PER_BETA_ANNEAL_STEPS`: schedule for annealing beta to `1.0`.
+- `SNAKE_PER_EPSILON`: small priority floor so transitions do not disappear from sampling.
+
+The Swift implementation keeps the main DQN responsibilities separated:
+
+- `DQNModel`: convolutional Q-network.
+- `DQNLearner`: Bellman targets, Double DQN target selection, loss, gradient clipping, and priority updates.
+- `ReplayBuffer`: uniform and prioritized replay storage/sampling.
+- `DQNTrainer`: training schedule, evaluation, checkpointing, TensorBoard, and GIF capture.
+- `DQNPlayer`: greedy playback against a saved checkpoint.
+- `DQNActivationDashboardPublisher` and `python/activation_viewer.py`: optional live activation visualization during playback.
+
 ## Quick Start
 
 Install Python dependencies:
