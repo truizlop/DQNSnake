@@ -57,6 +57,20 @@ final class DQNLearner {
         return action
     }
 
+    func inspectAction(for state: MLXArray) -> DQNActionInspection {
+        let snapshot = onlineQNetwork.forwardWithActivations(state)
+        let qValues = snapshot.qValues.asType(.float32).asArray(Float.self)
+        let greedyActionIndex = snapshot.qValues.argMax().item(Int.self)
+        guard let action = SnakeAction(rawValue: greedyActionIndex) else {
+            preconditionFailure("Invalid greedy action index produced by model: \(greedyActionIndex)")
+        }
+        return DQNActionInspection(
+            action: action,
+            qValues: qValues,
+            activations: snapshot
+        )
+    }
+
     func syncTargetFromOnline() {
         targetQNetwork.update(parameters: onlineQNetwork.parameters())
     }

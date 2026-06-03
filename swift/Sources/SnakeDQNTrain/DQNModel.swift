@@ -40,4 +40,19 @@ class DQNModel: Module {
         x = relu(dense(x))
         return output(x)
     }
+
+    func forwardWithActivations(_ input: MLXArray) -> DQNActivationSnapshot {
+        let conv1Activation = relu(conv1(input))
+        let conv2Activation = relu(conv2(conv1Activation))
+        let flattened = conv2Activation.flattened(start: 1)
+        let denseActivation = relu(dense(flattened))
+        let qValues = output(denseActivation)
+        return DQNActivationSnapshot(
+            input: input,
+            conv1: conv1Activation,
+            conv2: conv2Activation,
+            dense: denseActivation,
+            qValues: qValues
+        )
+    }
 }
