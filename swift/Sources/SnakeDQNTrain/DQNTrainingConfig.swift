@@ -61,4 +61,10 @@ struct DQNTrainingConfig {
     var playEpisodes: Int = 1
     var playRender: Bool = true
     var playGIFDirectory: String? = "runs/model_best_play"
+    var playActivationInspectionEnabled: Bool = false
+    var playActivationDirectory: String = "runs/model_best_play/activations"
+    var playActivationStepMode: Bool = false
+    var playActivationExportEverySteps: Int = 1
+    var playActivationDashboardEnabled: Bool = false
+    var playStepIntervalSeconds: Double = 2
 }

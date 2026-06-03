@@ -60,6 +60,17 @@ enum SnakeDQNTrainEnvironmentParser {
         config.playEpisodes = Int(env["SNAKE_PLAY_EPISODES"] ?? "") ?? config.playEpisodes
         config.playRender = (env["SNAKE_PLAY_RENDER"] ?? (config.playRender ? "1" : "0")) == "1"
         config.playGIFDirectory = env["SNAKE_PLAY_GIF_DIR"] ?? config.playGIFDirectory
+        config.playActivationInspectionEnabled =
+            (env["SNAKE_PLAY_ACTIVATIONS"] ?? (config.playActivationInspectionEnabled ? "1" : "0")) == "1"
+        config.playActivationDirectory = env["SNAKE_PLAY_ACTIVATION_DIR"] ?? config.playActivationDirectory
+        config.playActivationStepMode =
+            (env["SNAKE_PLAY_STEP_MODE"] ?? (config.playActivationStepMode ? "1" : "0")) == "1"
+        config.playActivationExportEverySteps =
+            Int(env["SNAKE_PLAY_ACTIVATION_EVERY_STEPS"] ?? "") ?? config.playActivationExportEverySteps
+        config.playActivationDashboardEnabled =
+            (env["SNAKE_PLAY_ACTIVATION_DASHBOARD"] ?? (config.playActivationDashboardEnabled ? "1" : "0")) == "1"
+        config.playStepIntervalSeconds =
+            Double(env["SNAKE_PLAY_STEP_INTERVAL_SECONDS"] ?? "") ?? config.playStepIntervalSeconds
         if config.playOnly {
             config.resumeCheckpointPath = explicitResumeCheckpointPath ?? "checkpoints/model_best.safetensors"
             config.enableTensorBoard = false

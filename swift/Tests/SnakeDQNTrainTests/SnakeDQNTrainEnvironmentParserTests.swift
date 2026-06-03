@@ -25,6 +25,12 @@ import Testing
             "SNAKE_PLAY_EPISODES": "2",
             "SNAKE_PLAY_RENDER": "0",
             "SNAKE_PLAY_GIF_DIR": "runs/custom_play",
+            "SNAKE_PLAY_ACTIVATIONS": "1",
+            "SNAKE_PLAY_ACTIVATION_DIR": "runs/custom_play/activations",
+            "SNAKE_PLAY_STEP_MODE": "1",
+            "SNAKE_PLAY_ACTIVATION_EVERY_STEPS": "3",
+            "SNAKE_PLAY_ACTIVATION_DASHBOARD": "1",
+            "SNAKE_PLAY_STEP_INTERVAL_SECONDS": "1.5",
             "SNAKE_SEED": "99",
         ],
         base: base
@@ -50,6 +56,12 @@ import Testing
     #expect(parsed.playEpisodes == 2)
     #expect(parsed.playRender == false)
     #expect(parsed.playGIFDirectory == "runs/custom_play")
+    #expect(parsed.playActivationInspectionEnabled)
+    #expect(parsed.playActivationDirectory == "runs/custom_play/activations")
+    #expect(parsed.playActivationStepMode)
+    #expect(parsed.playActivationExportEverySteps == 3)
+    #expect(parsed.playActivationDashboardEnabled)
+    #expect(parsed.playStepIntervalSeconds == 1.5)
     #expect(parsed.resumeCheckpointPath == "checkpoints/model_best.safetensors")
     #expect(parsed.enableTensorBoard == false)
     #expect(parsed.launchTensorBoard == false)

@@ -12,4 +12,10 @@ import Testing
     #expect(config.playEpisodes == 1)
     #expect(config.playRender)
     #expect(config.playGIFDirectory == "runs/model_best_play")
+    #expect(config.playActivationInspectionEnabled == false)
+    #expect(config.playActivationDirectory == "runs/model_best_play/activations")
+    #expect(config.playActivationStepMode == false)
+    #expect(config.playActivationExportEverySteps == 1)
+    #expect(config.playActivationDashboardEnabled == false)
+    #expect(config.playStepIntervalSeconds == 2)
 }

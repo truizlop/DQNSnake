@@ -276,20 +276,48 @@ struct DQNTrainer {
             throw DQNPlayOnlyError.missingCheckpoint
         }
         let resumedStep = try maybeResumeFromCheckpoint()
+        var activationDashboard: DQNActivationDashboardPublisher?
+        if config.playActivationInspectionEnabled, config.playActivationDashboardEnabled {
+            let dashboard = DQNActivationDashboardPublisher(
+                pythonExecutable: Self.pythonExecutable(),
+                pythonModulePath: Self.pythonModulePath()
+            )
+            try dashboard.start()
+            activationDashboard = dashboard
+        }
+        defer {
+            activationDashboard?.stop()
+        }
         let player = DQNPlayer(
             env: env,
             maxStepsPerEpisode: config.maxStepsPerEpisode,
             render: config.playRender,
             gifDirectory: config.playGIFDirectory,
             gifScale: config.bestEpisodeGIFScale,
-            gifFrameDurationMs: config.bestEpisodeGIFFrameDurationMs
+            gifFrameDurationMs: config.bestEpisodeGIFFrameDurationMs,
+            activationExporter: config.playActivationInspectionEnabled
+                ? DQNActivationExporter(
+                    directory: URL(fileURLWithPath: config.playActivationDirectory, isDirectory: true),
+                    exportEverySteps: config.playActivationExportEverySteps
+                )
+                : nil,
+            activationDashboard: activationDashboard,
+            stepMode: config.playActivationStepMode,
+            stepIntervalSeconds: config.playStepIntervalSeconds
         )
+        let learner = self.learner
+        let inspectAction: ((MLXArray) -> DQNActionInspection)? = config.playActivationInspectionEnabled
+            ? { state in
+                learner.inspectAction(for: state)
+            }
+            : nil
         let results = try await player.play(
             episodes: max(1, config.playEpisodes),
             fixedSeeds: config.evalFixedSeeds,
             selectAction: { state in
                 learner.greedyAction(for: state)
-            }
+            },
+            inspectAction: inspectAction
         )
         let averageApples = Float(results.reduce(0) { $0 + $1.applesEaten }) / Float(results.count)
         let averageScore = results.reduce(Float(0)) { $0 + $1.finalScore } / Float(results.count)
@@ -612,5 +640,19 @@ struct DQNTrainer {
             return "/opt/anaconda3/bin/python3"
         }
         return "/usr/bin/python3"
+    }
+
+    private static func pythonModulePath() -> String {
+        if let configured = ProcessInfo.processInfo.environment["SNAKE_PYTHON_DIR"], !configured.isEmpty {
+            return (configured as NSString).standardizingPath
+        }
+
+        let cwd = FileManager.default.currentDirectoryPath
+        let direct = (cwd as NSString).appendingPathComponent("python")
+        if FileManager.default.fileExists(atPath: direct) {
+            return direct
+        }
+
+        return (cwd as NSString).appendingPathComponent("../python")
     }
 }

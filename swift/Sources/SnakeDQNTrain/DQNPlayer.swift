@@ -9,19 +9,31 @@ struct DQNPlayer {
     let gifDirectory: String?
     let gifScale: Int
     let gifFrameDurationMs: Int
+    let activationExporter: DQNActivationExporter?
+    let activationDashboard: DQNActivationDashboardPublisher?
+    let stepMode: Bool
+    let stepIntervalSeconds: Double
     private let appleRewardThreshold: Float = 0.5
 
     func play(
         episodes: Int,
         fixedSeeds: [Int]?,
-        selectAction: (MLXArray) -> SnakeAction
+        selectAction: (MLXArray) -> SnakeAction,
+        inspectAction: ((MLXArray) -> DQNActionInspection)? = nil
     ) async throws -> [DQNEpisodeResult] {
         precondition(episodes > 0, "Play mode requires at least one episode.")
 
         var results: [DQNEpisodeResult] = []
+        var shouldPause = stepMode
         for index in 0..<episodes {
             let seed = fixedSeeds.map { seeds in seeds[index % seeds.count] }
-            let result = try await playEpisode(index: index + 1, seed: seed, selectAction: selectAction)
+            let result = try await playEpisode(
+                index: index + 1,
+                seed: seed,
+                shouldPause: &shouldPause,
+                selectAction: selectAction,
+                inspectAction: inspectAction
+            )
             results.append(result)
             try await maybeSaveGIF(episode: index + 1, result: result)
         }
@@ -31,13 +43,16 @@ struct DQNPlayer {
     private func playEpisode(
         index: Int,
         seed: Int?,
-        selectAction: (MLXArray) -> SnakeAction
+        shouldPause: inout Bool,
+        selectAction: (MLXArray) -> SnakeAction,
+        inspectAction: ((MLXArray) -> DQNActionInspection)?
     ) async throws -> DQNEpisodeResult {
         var stepsInEpisode = 0
         var totalReward: Float = 0
         var finalScore: Float = 0
         var applesEaten = 0
         var actionCounts: [SnakeAction: Int] = [:]
+        var stopEpisode = false
 
         let initial = try await env.reset(seed: seed)
         if render {
@@ -48,7 +63,40 @@ struct DQNPlayer {
         var state = stateTensor(from: frameStack.stacked(), width: initial.width, height: initial.height)
 
         while stepsInEpisode < maxStepsPerEpisode {
-            let action = selectAction(state)
+            let nextStep = stepsInEpisode + 1
+            let inspection = inspectAction?(state)
+            let action = inspection?.action ?? selectAction(state)
+            if let inspection {
+                try activationExporter?.export(
+                    inspection: inspection,
+                    episode: index,
+                    step: nextStep
+                )
+                printActivationSummary(
+                    inspection: inspection,
+                    episode: index,
+                    step: nextStep
+                )
+                activationDashboard?.publish(
+                    inspection: inspection,
+                    episode: index,
+                    step: nextStep
+                )
+                if shouldPause {
+                    switch waitForNextStep() {
+                    case .next:
+                        break
+                    case .runContinuously:
+                        shouldPause = false
+                    case .stopEpisode:
+                        stopEpisode = true
+                    }
+                }
+                if stopEpisode {
+                    break
+                }
+            }
+
             actionCounts[action, default: 0] += 1
             let stepResult = try await env.step(action: action.rawValue)
             if render {
@@ -80,6 +128,35 @@ struct DQNPlayer {
             "play episode=\(index) steps=\(result.steps) reward=\(result.totalReward) score=\(result.finalScore) apples=\(result.applesEaten)"
         )
         return result
+    }
+
+    private func printActivationSummary(
+        inspection: DQNActionInspection,
+        episode: Int,
+        step: Int
+    ) {
+        let qValues = SnakeAction.allCases.map { action in
+            "\(action)=\(String(format: "%.4f", inspection.qValues[action.rawValue]))"
+        }.joined(separator: " ")
+        print("activation episode=\(episode) step=\(step) action=\(inspection.action) \(qValues)")
+    }
+
+    private func waitForNextStep() -> DQNPlayStepCommand {
+        if stepIntervalSeconds > 0 {
+            print("step mode: auto-advancing in \(String(format: "%.2f", stepIntervalSeconds))s. Set SNAKE_PLAY_STEP_INTERVAL_SECONDS=0 for manual stepping.")
+            Thread.sleep(forTimeInterval: stepIntervalSeconds)
+            return .next
+        }
+
+        print("step mode: press Enter for next step, 'r' then Enter to run continuously, or 'q' then Enter to stop this episode.")
+        let command = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+        if command == "q" {
+            return .stopEpisode
+        }
+        if command == "r" {
+            return .runContinuously
+        }
+        return .next
     }
 
     private func maybeSaveGIF(episode: Int, result: DQNEpisodeResult) async throws {
