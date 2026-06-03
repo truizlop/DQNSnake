@@ -1,3 +1,5 @@
+![Training a model to play Snake using DQN](banner.png)
+
 # DQNSnake
 
 DQNSnake is a hybrid Snake reinforcement-learning project:
